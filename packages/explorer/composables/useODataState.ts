@@ -1,5 +1,6 @@
 import type { ODataLog as CoreODataLog, ProxyTraceEntry as CoreProxyTraceEntry, EntityMapping, ODataServiceConfig } from '@me-tools/odx-core'
 import type { ExplorerMutationTarget } from '../utils/recordIdentity'
+import type { ExplorerRequestTarget } from '../utils/requestTarget'
 import { useNuxtApp } from 'nuxt/app'
 import { onScopeDispose } from 'vue'
 import { createAppState } from '../utils/appState'
@@ -90,7 +91,7 @@ export interface VisualQueryState {
 
 export interface EditorState {
   show: boolean
-  mode: 'view' | 'create' | 'update' | 'headers' | 'response'
+  mode: 'view' | 'create' | 'update' | 'headers' | 'response' | 'request'
   json: string
   loading: boolean
   error: string | null
@@ -98,6 +99,8 @@ export interface EditorState {
   context?: string
   headersServiceName?: string
   conflict?: boolean
+  requestTarget?: ExplorerRequestTarget
+  outcomeUnknown?: boolean
   target?: ExplorerMutationTarget
   targetError?: string
 }

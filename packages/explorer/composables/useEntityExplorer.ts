@@ -1,12 +1,13 @@
 import type { EntityMapping } from '@me-tools/odx-core'
 import type { ExplorerMutationTarget } from '../utils/recordIdentity'
-import type { EditorState } from './useODataState'
+import type { EditorState, ODataServiceState } from './useODataState'
 import { flattenOData, validateODataIdentifier } from '@me-tools/odx-core'
 import { useNuxtApp } from 'nuxt/app'
 import { onScopeDispose, toRaw } from 'vue'
 import { createAppState } from '../utils/appState'
 import { captureExplorerRecordHeaders, createExplorerEditableRecord, resolveExplorerRecordIdentity } from '../utils/recordIdentity'
 import { readExplorerRequestError } from '../utils/requestError'
+import { createExplorerJSONHeaders, isExplorerWriteMethod } from '../utils/requestTarget'
 import { buildEntityPreviewCacheKey, buildRuntimeProxyUrl } from './useODataState'
 
 const RE_TRAILING_SLASH = /\/$/
@@ -231,14 +232,61 @@ function createEntityExplorer(): EntityExplorer {
   })
 
   function refreshEntityData(): Promise<void> {
-    return executeEntityData(queryMethod.value)
+    if (queryMethod.value === 'GET')
+      return reloadEntityData()
+    const service = selectedService.value
+    const entity = selectedEntity.value
+    if (!service || !entity)
+      return Promise.resolve()
+    if (!isExplorerWriteMethod(queryMethod.value)) {
+      previewError.value = 'Unsupported request method. No request was sent.'
+      return Promise.resolve()
+    }
+    try {
+      const target = Object.freeze({
+        serviceName: service.name,
+        entitySet: entity,
+        url: buildEntityRequestUrl(service, entity, queryInput.value, true),
+        method: queryMethod.value,
+        headers: createExplorerJSONHeaders(getSessionHeaders(service.name), entitySchema.value?.name === service.name ? entitySchema.value.version : undefined),
+      })
+      editor.value = {
+        show: true,
+        mode: 'request',
+        json: '{}',
+        loading: false,
+        error: null,
+        original: null,
+        context: `${target.method} ${target.url}`,
+        requestTarget: target,
+      }
+    }
+    catch (error) {
+      previewError.value = error instanceof Error ? error.message : String(error)
+    }
+    return Promise.resolve()
   }
 
   function reloadEntityData(): Promise<void> {
-    return executeEntityData('GET')
+    return executeEntityData()
   }
 
-  async function executeEntityData(method: string): Promise<void> {
+  function buildEntityRequestUrl(service: ODataServiceState, entity: string, query: string, throughProxy = false): string {
+    validateODataIdentifier(entity, 'Explorer entity set')
+    let path: string
+    if (!throughProxy && service.strategy === 'direct' && !useCORSBridge.value) {
+      if (!service.url)
+        throw new Error('The configured direct service URL is unavailable. No request was sent.')
+      path = `${service.url.replace(RE_TRAILING_SLASH, '')}/${entity}`
+    }
+    else {
+      const route = service.route || service.name.toLowerCase()
+      path = buildRuntimeProxyUrl(`${config.value.basePath}/${route}/${entity}`)
+    }
+    return query && query !== '?' ? `${path}${query.startsWith('?') ? query : `?${query}`}` : path
+  }
+
+  async function executeEntityData(): Promise<void> {
     if (!selectedService.value || !selectedEntity.value) {
       return
     }
@@ -247,47 +295,19 @@ function createEntityExplorer(): EntityExplorer {
     const entity = selectedEntity.value
     const svcName = service.name
     const query = queryInput.value
-    // Navigation can supersede reads; aborting a dispatched write cannot undo it.
-    const request = method === 'GET' ? previewRequest.begin() : null
-    const isCurrent = (): boolean => request ? request.isCurrent() : !disposed
+    const method = 'GET'
+    const request = previewRequest.begin()
+    const isCurrent = (): boolean => !disposed && request.isCurrent()
     const submittedQueryState = JSON.parse(JSON.stringify(queryState.value))
     const cacheKey = buildEntityPreviewCacheKey(svcName, entity)
 
-    if (request) {
-      previewLoading.value = true
-      previewError.value = null
-    }
+    previewLoading.value = true
+    previewError.value = null
     try {
-      const isDirect = service.strategy === 'direct'
-      let urlPath = ''
-
-      if (isDirect && !useCORSBridge.value) {
-        // True Direct Mode: Browser -> OData Service (Only if user explicitly opted-out of bridge)
-        const baseUrl = service.url?.replace(RE_TRAILING_SLASH, '')
-        urlPath = `${baseUrl}/${entity}`
-      }
-      else {
-        // Proxied Mode: Browser -> Nitro -> OData Service
-        // This is the default even for 'direct' services to avoid CORS issues in dev.
-        const route = service.route || svcName.toLowerCase()
-        urlPath = buildRuntimeProxyUrl(`${config.value.basePath}/${route}/${entity}`)
-      }
-
-      if (query && query !== '?') {
-        const q = query.startsWith('?') ? query : `?${query}`
-        urlPath += q
-      }
-
-      const res = await fetch(urlPath, {
+      const res = await fetch(buildEntityRequestUrl(service, entity, query), {
         method,
-        ...(request ? { signal: request.signal } : {}),
-        headers: {
-          'Accept': entitySchema.value?.name === service.name && entitySchema.value.version === 'v4'
-            ? 'application/json;IEEE754Compatible=true'
-            : 'application/json',
-          'Content-Type': 'application/json',
-          ...getSessionHeaders(service.name),
-        },
+        signal: request.signal,
+        headers: createExplorerJSONHeaders(getSessionHeaders(service.name), entitySchema.value?.name === service.name ? entitySchema.value.version : undefined),
       })
       if (!isCurrent())
         return
@@ -337,20 +357,6 @@ function createEntityExplorer(): EntityExplorer {
         data = { response: responseText }
       }
 
-      // For non-GET requests (POST, PUT, PATCH, DELETE), we show the response in the editor
-      if (method !== 'GET') {
-        editor.value = {
-          show: true,
-          mode: 'response',
-          json: typeof data === 'string' ? data : JSON.stringify(data, null, 2),
-          loading: false,
-          error: null,
-          original: null,
-          context: `${method} ${svcName}/${entity}`,
-        }
-        return
-      }
-
       const finalData = flattenOData(data)
       const dataArray = Array.isArray(finalData) ? finalData : (finalData ? [finalData] : [])
       previewOwner.value = { serviceName: svcName, entitySet: entity }
@@ -369,18 +375,6 @@ function createEntityExplorer(): EntityExplorer {
       if (!isCurrent())
         return
       const msg = (e as Error).message
-      if (!request) {
-        editor.value = {
-          show: true,
-          mode: 'response',
-          json: '{}',
-          loading: false,
-          error: msg,
-          original: null,
-          context: `${method} ${svcName}/${entity}`,
-        }
-        return
-      }
       previewError.value = msg
       previewData.value = []
       previewOwner.value = null
@@ -395,7 +389,7 @@ function createEntityExplorer(): EntityExplorer {
       }
     }
     finally {
-      if (request?.isCurrent())
+      if (isCurrent())
         previewLoading.value = false
     }
   }
@@ -447,16 +441,7 @@ function createEntityExplorer(): EntityExplorer {
       throw new Error('Metadata for the original service is unavailable. No request was sent.')
     const identity = mode === 'update' ? resolveExplorerRecordIdentity(entitySchema.value, entitySet, row) : undefined
     const concurrency = captureExplorerRecordHeaders(mode === 'update' ? row : null, getSessionHeaders(service.name))
-    const jsonType = identity?.version === 'v4' || (entitySchema.value?.name === service.name && entitySchema.value.version === 'v4')
-      ? 'application/json;IEEE754Compatible=true'
-      : 'application/json'
-    const headers = { ...concurrency.headers }
-    for (const name of Object.keys(headers)) {
-      if (name.toLowerCase() === 'accept' || name.toLowerCase() === 'content-type')
-        delete headers[name]
-    }
-    headers.Accept = jsonType
-    headers['Content-Type'] = jsonType
+    const headers = createExplorerJSONHeaders(concurrency.headers, identity?.version ?? (entitySchema.value?.name === service.name ? entitySchema.value.version : undefined))
     const route = service.route || service.name.toLowerCase()
     return Object.freeze({
       serviceName: service.name,
@@ -464,7 +449,7 @@ function createEntityExplorer(): EntityExplorer {
       url: buildRuntimeProxyUrl(`${config.value.basePath}/${route}/${identity?.entityPath ?? entitySet}`),
       method: mode === 'create' ? 'POST' : identity?.version === 'v2' ? 'MERGE' : 'PATCH',
       ...concurrency,
-      headers: Object.freeze(headers),
+      headers,
       ...(identity ? { key: identity.key } : {}),
       ...(identity ? { originalJson: JSON.stringify(row), navigationProperties: identity.navigationProperties } : {}),
     })

@@ -219,27 +219,52 @@ describe('explorer State Composable', () => {
     expect(state.logsError.value).toContain('HTTP 403')
   })
 
-  it('retains the outcome of a dispatched non-GET Execute after navigation', async () => {
+  it('prepares an immutable non-GET request without dispatching it before review', async () => {
     const state = useSharedODataState()
-    state.selectedService.value = { name: 'Northwind', route: 'northwind', strategy: 'proxied' } as any
+    const service = { name: 'Northwind', route: 'northwind', strategy: 'proxied', entities: [{ name: 'Products' }, { name: 'Suppliers' }] }
+    state.config.value = { basePath: '/api/odx', services: [service] }
+    state.selectedService.value = service as any
     state.selectedEntity.value = 'Products'
     await nextTick()
     const explorer = createEntityExplorer()
-    let resolveWrite!: (response: Response) => void
-    vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => resolveWrite = resolve))
-    state.queryMethod.value = 'DELETE'
-    const write = explorer.refreshEntityData()
-    expect(vi.mocked(fetch).mock.calls.at(-1)![1]?.signal).toBeUndefined()
+    state.queryMethod.value = 'POST'
+    state.queryInput.value = '?$select=ID'
+    state.sessionHeaders.value = { 'X-Session': 'original' }
+    vi.mocked(fetch).mockClear()
+    await explorer.refreshEntityData()
+    expect(fetch).not.toHaveBeenCalled()
+    const target = explorer.editor.value.requestTarget
     state.selectedEntity.value = 'Suppliers'
-    resolveWrite(new Response(JSON.stringify({ result: 'accepted' })))
-    await write
+    state.queryInput.value = '?$top=1'
+    state.queryMethod.value = 'DELETE'
+    state.sessionHeaders.value = { 'X-Session': 'changed' }
     expect(explorer.editor.value).toMatchObject({
       show: true,
-      mode: 'response',
-      context: 'DELETE Northwind/Products',
-      json: JSON.stringify({ result: 'accepted' }, null, 2),
+      mode: 'request',
+      context: 'POST /api/odx/northwind/Products?$select=ID',
+      json: '{}',
+      requestTarget: { method: 'POST', url: '/api/odx/northwind/Products?$select=ID', headers: { 'X-Session': 'original' } },
     })
+    expect(Object.isFrozen(target)).toBe(true)
+    expect(Object.isFrozen(target?.headers)).toBe(true)
     expect(state.entityDataCache.value[buildEntityPreviewCacheKey('Northwind', 'Suppliers')]).toBeUndefined()
+  })
+
+  it('keeps raw writes on the host proxy when direct reads have opted out of the bridge', async () => {
+    const state = useSharedODataState()
+    const service = { name: 'Northwind', route: 'northwind', strategy: 'direct', url: 'https://synthetic.invalid/odata', entities: [{ name: 'Products' }] }
+    state.config.value = { basePath: '/api/odx', services: [service] }
+    state.selectedService.value = service as any
+    state.selectedEntity.value = 'Products'
+    const explorer = createEntityExplorer()
+    await nextTick()
+    await nextTick()
+    state.useCORSBridge.value = false
+    state.queryMethod.value = 'PATCH'
+    vi.mocked(fetch).mockClear()
+    await explorer.refreshEntityData()
+    expect(fetch).not.toHaveBeenCalled()
+    expect(explorer.editor.value.requestTarget?.url).toBe('/api/odx/northwind/Products')
   })
 
   it('clears server and local traffic logs', async () => {
@@ -1256,8 +1281,9 @@ describe('explorer State Composable', () => {
     await nextTick()
     await nextTick()
     state.entitySchema.value = { name: 'Northwind', version: 'v4', entities: [] }
+    state.sessionHeaders.value = { 'accept': 'text/xml', 'CONTENT-TYPE': 'text/plain', 'X-Session': 'synthetic' }
     await explorer.reloadEntityData()
-    expect(vi.mocked(fetch).mock.calls.at(-1)?.[1]?.headers).toMatchObject({ Accept: 'application/json;IEEE754Compatible=true' })
+    expect(vi.mocked(fetch).mock.calls.at(-1)?.[1]?.headers).toEqual({ 'Accept': 'application/json;IEEE754Compatible=true', 'Content-Type': 'application/json;IEEE754Compatible=true', 'X-Session': 'synthetic' })
   })
 
   it('captures the original editor target, method and headers before selection changes', async () => {
@@ -1381,7 +1407,7 @@ describe('explorer State Composable', () => {
       signal: expect.any(AbortSignal),
       headers: {
         'Accept': 'application/json;IEEE754Compatible=true',
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json;IEEE754Compatible=true',
       },
     })
     expect(previewData.value).toEqual([{ ID: 'refreshed' }])

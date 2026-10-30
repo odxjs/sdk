@@ -99,6 +99,127 @@ describe('explorer real browser usage', async () => {
     }
   })
 
+  it('reviews a raw request body before dispatch and shows the actual response', async () => {
+    const { context, page, errors } = await openExplorer('pointer')
+    try {
+      await page.getByRole('combobox', { name: 'Request method', exact: true }).click()
+      await page.getByRole('option', { name: 'POST', exact: true }).click()
+      await page.getByRole('button', { name: 'Prepare Request', exact: true }).click()
+      const editor = page.getByRole('dialog')
+      await expect.poll(() => editor.getByText('POST /api/odx/catalog/Products', { exact: true }).isVisible()).toBe(true)
+      expect(backend.requests.every(request => request.method === 'GET')).toBe(true)
+      await editor.locator('textarea').fill('{invalid JSON')
+      await editor.getByRole('button', { name: 'Send Request', exact: true }).click()
+      await expect.poll(() => editor.getByText(/Invalid JSON:/).isVisible()).toBe(true)
+      expect(backend.requests.every(request => request.method === 'GET')).toBe(true)
+      await editor.locator('textarea').fill(JSON.stringify({ ID: 9, Name: 'Raw created desk' }))
+      await editor.getByRole('button', { name: 'Send Request', exact: true }).click()
+      await expect.poll(() => editor.getByRole('heading', { name: 'Response Data', exact: true }).isVisible()).toBe(true)
+      expect(JSON.parse(await editor.locator('textarea').inputValue())).toEqual({ ID: 9, Name: 'Raw created desk' })
+      await expect.poll(() => page.getByRole('row', { includeHidden: true }).filter({ hasText: 'Raw created desk' }).count()).toBe(1)
+      const writes = backend.requests.filter(request => request.method !== 'GET')
+      expect(writes).toHaveLength(1)
+      expect(writes[0]).toMatchObject({ method: 'POST', url: '/odata/Products', body: JSON.stringify({ ID: 9, Name: 'Raw created desk' }) })
+      expect(errors).toEqual([])
+    }
+    finally {
+      await page.unrouteAll({ behavior: 'wait' })
+      await context.close()
+    }
+  })
+
+  it('does not re-arm a raw POST when its upstream outcome is uncertain', async () => {
+    const { context, page, errors } = await openExplorer('pointer')
+    try {
+      await page.route('**/api/odx/catalog/Products*', async (route) => {
+        if (route.request().method() !== 'POST') {
+          await route.fallback()
+          return
+        }
+        await route.fetch({ url: `${backend.origin}/api/odx/catalog/Products` })
+        await route.fulfill({ status: 502, json: { message: 'Synthetic lost upstream response' } })
+      })
+      await page.getByRole('combobox', { name: 'Request method', exact: true }).click()
+      await page.getByRole('option', { name: 'POST', exact: true }).click()
+      await page.getByRole('button', { name: 'Prepare Request', exact: true }).click()
+      const editor = page.getByRole('dialog')
+      await editor.locator('textarea').fill(JSON.stringify({ ID: 9, Name: 'Uncertain created desk' }))
+      await editor.getByRole('button', { name: 'Send Request', exact: true }).click()
+      await expect.poll(() => editor.getByText(/The write outcome is unknown/).isVisible()).toBe(true)
+      expect(await editor.getByRole('button', { name: 'Send Request', exact: true }).isDisabled()).toBe(true)
+      expect(backend.requests.filter(request => request.method === 'POST')).toHaveLength(1)
+      await editor.getByRole('button', { name: 'Close and reload data', exact: true }).click()
+      await expect.poll(() => editor.count()).toBe(0)
+      await expect.poll(() => page.getByRole('row').filter({ hasText: 'Uncertain created desk' }).isVisible()).toBe(true)
+      expect(backend.requests.filter(request => request.method === 'POST')).toHaveLength(1)
+      expect(errors.filter(error => !error.includes('status of 502'))).toEqual([])
+    }
+    finally {
+      await page.unrouteAll({ behavior: 'wait' })
+      await context.close()
+    }
+  })
+
+  it('can cancel a prepared DELETE without dispatching a bodyless mutation', async () => {
+    const { context, page, errors } = await openExplorer('keyboard')
+    try {
+      await page.getByRole('combobox', { name: 'Request method', exact: true }).click()
+      await page.getByRole('option', { name: 'DELETE', exact: true }).click()
+      await page.getByRole('button', { name: 'Prepare Request', exact: true }).click()
+      const editor = page.getByRole('dialog')
+      await expect.poll(() => editor.getByText('DELETE sends no request body.', { exact: true }).isVisible()).toBe(true)
+      await editor.getByRole('button', { name: 'Cancel', exact: true }).click()
+      await expect.poll(() => editor.count()).toBe(0)
+      expect(backend.requests.every(request => request.method === 'GET')).toBe(true)
+      expect(errors).toEqual([])
+    }
+    finally {
+      await page.unrouteAll({ behavior: 'wait' })
+      await context.close()
+    }
+  })
+
+  it('keeps a newer record editor intact when a dispatched raw POST finishes late', async () => {
+    const { context, page, errors } = await openExplorer('pointer')
+    let release!: () => void
+    const released = new Promise<void>(resolve => release = resolve)
+    let captured!: () => void
+    const dispatched = new Promise<void>(resolve => captured = resolve)
+    try {
+      await page.route('**/api/odx/catalog/Products*', async (route) => {
+        if (route.request().method() !== 'POST') {
+          await route.fallback()
+          return
+        }
+        const response = await route.fetch({ url: `${backend.origin}/api/odx/catalog/Products` })
+        captured()
+        await released
+        await route.fulfill({ response })
+      })
+      await page.getByRole('combobox', { name: 'Request method', exact: true }).click()
+      await page.getByRole('option', { name: 'POST', exact: true }).click()
+      await page.getByRole('button', { name: 'Prepare Request', exact: true }).click()
+      const editor = page.getByRole('dialog')
+      await editor.locator('textarea').fill(JSON.stringify({ ID: 9, Name: 'Late raw created desk' }))
+      await editor.getByRole('button', { name: 'Send Request', exact: true }).click()
+      await dispatched
+      await editor.getByRole('button', { name: 'Cancel', exact: true }).click()
+      await expect.poll(() => editor.count()).toBe(0)
+      await page.getByRole('row').filter({ has: page.getByRole('cell', { name: 'Desk', exact: true }) }).getByRole('button', { name: 'Edit record', exact: true }).click()
+      release()
+      await expect.poll(() => page.getByText('POST request succeeded (HTTP 201)', { exact: true }).isVisible()).toBe(true)
+      expect(JSON.parse(await editor.locator('textarea').inputValue())).toMatchObject({ ID: 1, Name: 'Desk' })
+      expect(await editor.getByRole('heading', { name: 'Edit Record', exact: true }).isVisible()).toBe(true)
+      expect(backend.requests.filter(request => request.method !== 'GET')).toHaveLength(1)
+      expect(errors).toEqual([])
+    }
+    finally {
+      release()
+      await page.unrouteAll({ behavior: 'wait' })
+      await context.close()
+    }
+  })
+
   it('updates and deletes key zero without creating a record and preserves session headers', async () => {
     const { context, page, errors } = await openExplorer('pointer')
     try {
@@ -338,10 +459,15 @@ describe('explorer real browser usage', async () => {
       expect(JSON.parse(await editor.locator('textarea').inputValue())).toEqual(draft)
       const method = version === 'v2' ? 'MERGE' : 'PATCH'
       expect(contract.requests.filter(request => request.method === method).map(request => request.ifMatch)).toEqual(['W/"1"'])
-      expect(await page.getByRole('row').filter({ hasText: 'My preserved draft' }).count()).toBe(0)
+      expect(await page.getByRole('row', { includeHidden: true }).filter({ hasText: 'My preserved draft' }).count()).toBe(0)
       if (process.env.ODX_EXPLORER_BROWSER_EVIDENCE === '1') {
         const directory = fileURLToPath(new URL('../../../.artifacts/explorer-baseline-2026-10-30/journeys/', import.meta.url))
         await mkdir(directory, { recursive: true })
+        await editor.evaluate(async (element) => {
+          await Promise.all(element.getAnimations({ subtree: true })
+            .filter(animation => animation.effect?.getTiming().iterations !== Infinity)
+            .map(animation => animation.finished.catch(() => {})))
+        })
         await page.screenshot({ path: `${directory}/${version}-conflict.png` })
       }
       await editor.getByRole('button', { name: 'Discard draft and reload', exact: true }).click()

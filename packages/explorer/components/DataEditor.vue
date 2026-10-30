@@ -24,8 +24,10 @@ const modeConfig = computed(() => {
       return { title: 'Edit Record', icon: 'i-lucide-pencil', method: editor.value.target?.method ?? 'UPDATE' }
     case 'headers':
       return { title: 'Session Headers', icon: 'i-lucide-sliders-horizontal', method: 'CONFIG' }
+    case 'request':
+      return { title: 'Send Request', icon: 'i-lucide-send', method: editor.value.requestTarget?.method ?? 'REQUEST' }
     case 'response':
-      return { title: 'Response Data', icon: 'i-lucide-terminal', method: 'REST' }
+      return { title: 'Response Data', icon: 'i-lucide-terminal', method: editor.value.requestTarget?.method ?? 'REST' }
     case 'view':
     default:
       return { title: 'View Details', icon: 'i-lucide-eye', method: 'GET' }
@@ -89,9 +91,12 @@ watch(
  */
 async function saveItem() {
   const draft = editor.value
+  if (draft.loading || draft.outcomeUnknown)
+    return
   draft.loading = true
   draft.error = null
   draft.conflict = false
+  let writeDispatched = false
 
   try {
     const payload = JSON.parse(draft.json)
@@ -115,6 +120,36 @@ async function saveItem() {
       return
     }
 
+    if (draft.mode === 'request') {
+      const target = draft.requestTarget
+      if (!target)
+        throw new Error('The original request target is unavailable. No request was sent.')
+      writeDispatched = true
+      const res = await fetch(target.url, {
+        method: target.method,
+        headers: target.headers,
+        ...(target.method === 'DELETE' ? {} : { body: JSON.stringify(payload) }),
+      })
+      if (!res.ok)
+        throw await readExplorerRequestError(res)
+      delete entityDataCache.value[buildEntityPreviewCacheKey(target.serviceName, target.entitySet)]
+      const text = await res.text().catch(() => 'The request succeeded, but its response body could not be read.')
+      let json = text
+      try {
+        json = JSON.stringify(JSON.parse(text), null, 2)
+      }
+      catch {}
+      toast.add({ title: `${target.method} request succeeded (HTTP ${res.status})`, color: 'success' })
+      if (editor.value === draft && draft.show) {
+        draft.mode = 'response'
+        draft.context = `${target.method} ${target.url} · HTTP ${res.status}`
+        draft.json = json
+      }
+      if (selectedService.value?.name === target.serviceName && selectedEntity.value === target.entitySet)
+        emit('refresh')
+      return
+    }
+
     if (draft.mode !== 'create' && draft.mode !== 'update')
       throw new Error('This editor does not send record mutations.')
     const target = draft.target
@@ -131,6 +166,7 @@ async function saveItem() {
       draft.show = false
       return
     }
+    writeDispatched = true
     const res = await fetch(target.url, {
       method: target.method,
       headers: target.headers,
@@ -152,16 +188,27 @@ async function saveItem() {
       emit('refresh')
   }
   catch (e: unknown) {
-    draft.conflict = e instanceof ExplorerRequestError && e.conflict
+    draft.conflict = draft.mode !== 'request' && e instanceof ExplorerRequestError && e.conflict
     if (e instanceof SyntaxError) {
       draft.error = formatJsonError(e)
     }
     else {
       draft.error = e instanceof Error ? e.message : String(e)
     }
+    const failedTarget = draft.requestTarget ?? draft.target
+    if (writeDispatched && failedTarget) {
+      if (!(e instanceof ExplorerRequestError) || e.status >= 500) {
+        draft.outcomeUnknown = true
+        delete entityDataCache.value[buildEntityPreviewCacheKey(failedTarget.serviceName, failedTarget.entitySet)]
+        draft.error = `The write outcome is unknown. Check current data before starting another write. ${draft.error}`
+      }
+      else if (draft.mode === 'request' && e.conflict) {
+        draft.error = `Request rejected (HTTP ${e.status}). Review the payload and prepare a new request if its headers must change. ${e.detail}`
+      }
+    }
     if (editor.value !== draft || !draft.show) {
       toast.add({
-        title: `Request failed: ${draft.target?.serviceName ?? draft.headersServiceName ?? ''}/${draft.context ?? ''}`,
+        title: `Request failed: ${draft.target?.serviceName ?? draft.requestTarget?.serviceName ?? draft.headersServiceName ?? ''}/${draft.context ?? ''}`,
         description: draft.error,
         icon: 'i-lucide-circle-x',
         color: 'error',
@@ -180,8 +227,10 @@ function close() {
   editor.value.show = false
 }
 
-const canReloadOriginal = computed(() => selectedService.value?.name === editor.value.target?.serviceName
-  && selectedEntity.value === editor.value.target?.entitySet)
+const canReloadOriginal = computed(() => {
+  const target = editor.value.target ?? editor.value.requestTarget
+  return Boolean(target && selectedService.value?.name === target.serviceName && selectedEntity.value === target.entitySet)
+})
 
 function discardAndReload() {
   if (!canReloadOriginal.value)
@@ -206,6 +255,11 @@ function discardAndReload() {
 
     <template #body>
       <div class="flex flex-col h-full py-2">
+        <p v-if="editor.mode === 'request'" class="mb-3 text-sm text-muted">
+          Review the method, URL and JSON before sending. This advanced request
+          uses the captured query and session headers; row-key and ETag automation
+          applies to the separate Edit and Delete record actions.
+        </p>
         <div class="flex-1 relative flex flex-col min-h-0 bg-default rounded-xl ring-1 ring-default shadow-sm focus-within:ring-2 focus-within:ring-primary transition-all overflow-hidden">
           <div class="px-4 py-2.5 flex items-center justify-between border-b border-default bg-default/50 shrink-0">
             <div class="flex items-center gap-2">
@@ -220,7 +274,11 @@ function discardAndReload() {
           </div>
 
           <div class="flex-1 min-h-0 relative bg-transparent rounded-b-xl overflow-hidden">
+            <p v-if="editor.mode === 'request' && editor.requestTarget?.method === 'DELETE'" class="p-4 text-sm text-muted">
+              DELETE sends no request body.
+            </p>
             <ShikiEditor
+              v-else
               v-model="editor.json"
               :readonly="editor.mode === 'view' || editor.mode === 'response'"
             />
@@ -253,8 +311,8 @@ function discardAndReload() {
     <template v-if="editor.mode !== 'view' && editor.mode !== 'response'" #footer>
       <div class="flex items-center justify-end gap-3 w-full">
         <UButton
-          v-if="editor.conflict"
-          label="Discard draft and reload"
+          v-if="editor.conflict || editor.outcomeUnknown"
+          :label="editor.outcomeUnknown ? 'Close and reload data' : 'Discard draft and reload'"
           color="neutral"
           variant="outline"
           :disabled="!canReloadOriginal || editor.loading"
@@ -268,10 +326,11 @@ function discardAndReload() {
           @click="close"
         />
         <UButton
-          :label="editor.mode === 'create' ? 'Create Record' : 'Save Changes'"
+          :label="editor.mode === 'request' ? 'Send Request' : editor.mode === 'create' ? 'Create Record' : 'Save Changes'"
           color="primary"
           class="px-5 font-semibold shadow-sm"
           :loading="editor.loading"
+          :disabled="editor.outcomeUnknown"
           @click="saveItem"
         />
       </div>

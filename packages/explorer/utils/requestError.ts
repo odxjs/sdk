@@ -12,7 +12,7 @@ function readMessage(value: unknown): string | undefined {
 export class ExplorerRequestError extends Error {
   readonly conflict: boolean
 
-  constructor(readonly status: number, detail: string) {
+  constructor(readonly status: number, readonly detail: string) {
     const conflict = status === 409 || status === 412 || status === 428
     super(conflict
       ? `Request conflict (HTTP ${status}). Reload data before retrying. ${detail}`

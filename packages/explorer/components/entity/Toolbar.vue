@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useEntityExplorer } from '../../composables/useEntityExplorer'
+import { EXPLORER_WRITE_METHODS } from '../../utils/requestTarget'
 import QueryBuilder from './QueryBuilder.vue'
 
 const {
@@ -12,7 +13,7 @@ const {
   downloadJson,
 } = useEntityExplorer()
 
-const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
+const methods = ['GET', ...EXPLORER_WRITE_METHODS]
 const showBuilder = ref(false)
 </script>
 
@@ -51,7 +52,7 @@ const showBuilder = ref(false)
         />
       </div>
       <UButton
-        label="Execute"
+        :label="queryMethod === 'GET' ? 'Execute' : 'Prepare Request'"
         icon="i-lucide-play"
         color="primary"
         size="md"

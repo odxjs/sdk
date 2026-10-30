@@ -114,5 +114,27 @@ conflict. Use **Discard draft and reload** to explicitly abandon it and fetch
 current data before reopening the record. The Explorer does not automatically
 retry a conflicted write or silently overwrite the record.
 
+## Advanced requests
+
+The query toolbar executes GET directly. Selecting POST, PUT, PATCH, MERGE or
+DELETE changes its action to **Prepare Request**. Review the captured method,
+URL/query, session headers and JSON in the editor, then use **Send Request**.
+Invalid JSON is rejected before transport. DELETE deliberately sends no body.
+The actual HTTP status and response body appear in the same editor after a
+successful request; late results do not replace an editor opened afterwards.
+
+These requests use the host proxy route, consistently with row mutations,
+even when browser-direct reads have opted out of the CORS bridge. Existing
+service strategy, proxy policy and backend authorization still apply. Advanced
+requests use the explicit target/query/headers rather than inventing row keys
+or ETags: use ordinary Edit/Delete for metadata-owned record operations.
+
+After a dispatched editor write has a network or 5xx failure, its outcome may
+be unknown. The editor preserves the draft, invalidates the cached preview and
+disables sending that request again. **Close and reload data** lets you inspect
+current service state before preparing another write. A known raw-request
+409/412/428 instead asks you to review its payload/headers; reloading a row does
+not automatically replace explicitly supplied raw headers.
+
 For documentation on the DevTools UI and debugging patterns, see the root
 documentation in this repository.

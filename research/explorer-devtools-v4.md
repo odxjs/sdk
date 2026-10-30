@@ -68,6 +68,34 @@ case-insensitively so Accept/Content-Type values are not duplicated. The latter
 has a failing-before/passing-after HTTP contract. The focused proxy/header run
 passes 39 cases. These remain synthetic local contracts, not SAP/BTP acceptance.
 
+### D3: explicit raw requests and uncertain write outcomes
+
+The query toolbar now executes GET or prepares a non-GET request for review;
+it never sends a bodyless write merely because a selector changed. The request
+editor captures URL/query, service, entity, method and headers. JSON validation
+precedes dispatch, DELETE explicitly omits a body, and HTTP status/response are
+shown without replacing a later editor. Raw requests consistently use the host
+proxy route, including when direct reads have opted out of the CORS bridge.
+The existing direct/proxied service strategy still owns downstream policy;
+this does not add authorization to the direct bridge.
+
+Opus identified that uncertain raw outcomes could invite resending. Dispatched
+editor writes now invalidate their cache and disable resending after network or
+5xx failures. The preserved draft offers an explicit close-and-GET-reload path
+before another request is prepared. Raw 409/412/428 guidance stays distinct
+from row ETag recovery; explicit raw headers do not silently refresh themselves.
+A local re-entrancy guard also protects submission independently of button
+library behavior. GET and write negotiation now share the same typed helper.
+
+Executed evidence: 83 focused state/key/error/request cases pass; Explorer
+typecheck and changed-file lint pass. All 22 production Chromium journeys pass,
+including JSON rejection before transport, a real POST/201 response and GET
+refresh, a cancelled prepared DELETE, a late POST preserving a newer row editor,
+and an upstream-accepted POST whose response becomes 502. The last case proves
+one write, a disabled Send action, and explicit GET recovery showing that the
+record already exists. Screenshots wait for finite UI animations rather than
+capturing the alert halfway through its entrance transition.
+
 ### Earlier baseline and native integration
 
 The executable baseline/controller work is implemented in local commits

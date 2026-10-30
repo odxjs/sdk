@@ -85,6 +85,30 @@ export async function createExplorerBrowserBackend(options: { version?: 'v2' | '
       return
     }
     response.setHeader('Content-Type', 'application/json')
+    if (request.method === 'POST' && request.url === '/odata/Products') {
+      try {
+        const payload: unknown = JSON.parse(Buffer.concat(chunks).toString())
+        if (payload === null || typeof payload !== 'object' || Array.isArray(payload)
+          || !('Name' in payload) || typeof payload.Name !== 'string') {
+          throw new Error('Expected a named record.')
+        }
+        const id = 'ID' in payload ? payload.ID : products.length + 1
+        if (products.some(record => record.ID === id)) {
+          response.statusCode = 409
+          response.end(JSON.stringify({ error: { message: 'Duplicate fixture key.' } }))
+          return
+        }
+        const created = { ...payload, ID: id }
+        products.push(created)
+        response.statusCode = 201
+        response.end(JSON.stringify(created))
+      }
+      catch {
+        response.statusCode = 400
+        response.end(JSON.stringify({ error: { message: 'Expected a valid JSON record.' } }))
+      }
+      return
+    }
     if (request.method !== 'GET') {
       if (options.concurrency && version === 'v4'
         && (request.headers.accept !== 'application/json;IEEE754Compatible=true'
