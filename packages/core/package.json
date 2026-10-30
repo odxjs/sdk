@@ -38,7 +38,7 @@
     "node": "^22.0.0 || ^24.0.0"
   },
   "scripts": {
-    "verify": "pnpm run test && pnpm run typecheck && tsx ../../examples/core-standalone.ts",
+    "verify": "pnpm run test && pnpm run typecheck && pnpm --workspace-root run example:core",
     "build": "unbuild",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",

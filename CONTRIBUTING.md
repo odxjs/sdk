@@ -121,6 +121,13 @@ internal-only information.
 
 ## Dependencies
 
+Use the pinned pnpm 11 toolchain. Project settings and overrides belong in
+`pnpm-workspace.yaml`; pnpm configuration environment variables use the
+`PNPM_CONFIG_` prefix. Do not rely on legacy `.npmrc` non-auth settings or
+`package.json`'s `pnpm.overrides` field. Avoid undeclared dependencies made
+accidentally available by hoisting. Root-owned standalone examples run through
+their root scripts, including when called by a package's verification command.
+
 Do not add new dependencies unless they are necessary for the current change.
 
 Prefer well-maintained, widely used packages.

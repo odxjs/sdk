@@ -40,7 +40,7 @@
   "scripts": {
     "build": "unbuild",
     "test": "vitest run",
-    "verify": "vitest run && tsx ../../examples/proxy-standalone.ts",
+    "verify": "vitest run && pnpm --workspace-root run example:proxy",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "prepack": "pnpm run build && pnpm run verify",
     "build:runtime": "nitropack build",
