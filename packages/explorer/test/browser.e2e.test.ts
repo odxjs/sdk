@@ -99,6 +99,38 @@ describe('explorer real browser usage', async () => {
     }
   })
 
+  it('uses host read-only capabilities and still rejects a manual write at the real proxy', async () => {
+    const contract = await createExplorerBrowserBackend({ readOnly: true })
+    let opened: Awaited<ReturnType<typeof openExplorer>> | undefined
+    try {
+      opened = await openExplorer('keyboard', undefined, contract)
+      const { page, errors } = opened
+      const row = page.getByRole('row').filter({ hasText: 'Zero desk' })
+      expect(await row.getByRole('button', { name: 'Edit record', exact: true }).isDisabled()).toBe(true)
+      expect(await row.getByRole('button', { name: 'Delete record', exact: true }).isDisabled()).toBe(true)
+      expect(await page.getByRole('button', { name: 'New Record', exact: true }).isDisabled()).toBe(true)
+      await page.getByRole('combobox', { name: 'Request method', exact: true }).click()
+      expect(await page.getByRole('option', { name: 'POST', exact: true }).count()).toBe(0)
+      await page.keyboard.press('Escape')
+      await page.getByRole('button', { name: 'Service actions', exact: true }).click()
+      expect(await page.getByRole('menuitem', { name: 'Regenerate SDK', exact: true }).count()).toBe(0)
+      await page.getByRole('menuitem', { name: 'Refresh Metadata', exact: true }).click()
+      await expect.poll(() => page.getByText('Metadata Refreshed', { exact: true }).isVisible()).toBe(true)
+      const rejected = await page.evaluate(async () => {
+        const response = await fetch('/api/odx/catalog/Products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ID: 9, Name: 'Forbidden write' }) })
+        return response.status
+      })
+      expect(rejected).toBe(405)
+      expect(contract.requests.some(request => request.method !== 'GET')).toBe(false)
+      expect(errors.filter(error => !error.includes('status of 405'))).toEqual([])
+    }
+    finally {
+      await opened?.page.unrouteAll({ behavior: 'wait' })
+      await opened?.context.close()
+      await contract.close()
+    }
+  })
+
   it('reviews a raw request body before dispatch and shows the actual response', async () => {
     const { context, page, errors } = await openExplorer('pointer')
     try {

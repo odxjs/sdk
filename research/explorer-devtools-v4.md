@@ -96,6 +96,31 @@ one write, a disabled Send action, and explicit GET recovery showing that the
 record already exists. Screenshots wait for finite UI animations rather than
 capturing the alert halfway through its entrance transition.
 
+### D4a: host capabilities and static method restrictions
+
+The config API now advertises generator presence rather than relying on a Node
+version. No-generator hosts can complete metadata refresh without returning a
+false 501 failure. Development type-endpoint availability remains distinct from
+proof that files exist. Production config exposes only the typed derived flags
+and method names, preserving the existing credential/rule-content redaction.
+
+Static allow/deny method rules are intersected using the same case-sensitive
+semantics as the guard. Direct services retain their existing rule boundary;
+dynamic scopes, hooks, attributes and backend authorization remain server-owned.
+The UI filters raw methods and disables restricted Create/Edit/Delete actions.
+Controller capture and editor sends use the latest config policy, including the
+window before Vue rebinds selectedService. DELETE is checked independently from
+PATCH/MERGE. A denied GET cancels stale reads and clears its preview/loading.
+
+Executed evidence: 172 combined Explorer/controller/native-adapter/proxy-policy
+regressions pass, including a policy replacement before watcher flush. All 23
+freshly built production Chromium journeys passed at the UI checkpoint; the
+additional browser case verifies disabled read-only controls, real metadata
+refresh and a manually dispatched POST rejected with HTTP 405 before reaching
+the upstream. Root and Explorer typechecks pass after rebuilding the new public
+core types. Opus's remaining generation-after-refresh partial-failure finding
+is the next bounded follow-up; it is not claimed resolved here.
+
 ### Earlier baseline and native integration
 
 The executable baseline/controller work is implemented in local commits

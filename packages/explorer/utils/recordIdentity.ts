@@ -14,7 +14,7 @@ export interface ExplorerMutationTarget {
   readonly serviceName: string
   readonly entitySet: string
   readonly url: string
-  readonly method: 'POST' | 'PATCH' | 'MERGE'
+  readonly method: 'POST' | 'PATCH' | 'MERGE' | 'DELETE'
   readonly headers: Readonly<Record<string, string>>
   readonly key?: ODataTypedKey
   readonly etag?: string

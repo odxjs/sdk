@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useEntityExplorer } from '../../composables/useEntityExplorer'
+import { permitsExplorerDataMethod } from '../../utils/capabilities'
 import { EXPLORER_WRITE_METHODS } from '../../utils/requestTarget'
 import QueryBuilder from './QueryBuilder.vue'
 
 const {
   queryInput,
+  selectedService,
   queryMethod,
   refreshEntityData,
   previewData,
@@ -13,7 +15,7 @@ const {
   downloadJson,
 } = useEntityExplorer()
 
-const methods = ['GET', ...EXPLORER_WRITE_METHODS]
+const methods = computed(() => ['GET', ...EXPLORER_WRITE_METHODS].filter(method => permitsExplorerDataMethod(selectedService.value, method)))
 const showBuilder = ref(false)
 </script>
 
@@ -25,6 +27,7 @@ const showBuilder = ref(false)
         v-model="queryMethod"
         aria-label="Request method"
         :items="methods"
+        :disabled="methods.length === 0"
         class="font-mono min-w-24"
         size="md"
         variant="subtle"
@@ -53,6 +56,7 @@ const showBuilder = ref(false)
       </div>
       <UButton
         :label="queryMethod === 'GET' ? 'Execute' : 'Prepare Request'"
+        :disabled="!permitsExplorerDataMethod(selectedService, queryMethod)"
         icon="i-lucide-play"
         color="primary"
         size="md"
@@ -80,6 +84,7 @@ const showBuilder = ref(false)
       </div>
       <UButton
         label="New Record"
+        :disabled="!permitsExplorerDataMethod(selectedService, 'POST')"
         icon="i-lucide-plus"
         variant="outline"
         color="neutral"

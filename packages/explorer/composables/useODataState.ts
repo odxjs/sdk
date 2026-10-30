@@ -39,6 +39,8 @@ export interface ODataServiceState extends Omit<ODataServiceConfig, 'route' | 's
   capabilities?: {
     sdkGeneration?: boolean
     generatedTypes?: boolean
+    dataMethods?: string[]
+    metadataRefresh?: boolean
   }
 }
 
@@ -50,6 +52,7 @@ export interface ODataConfig {
   capabilities?: {
     sdkGeneration?: boolean
     generatedTypes?: boolean
+    metadataRefresh?: boolean
   }
   forwardAuthHeader?: boolean
   versions?: {
@@ -196,14 +199,11 @@ export function buildRuntimeProxyUrl(path: string): string {
 }
 
 export function supportsSdkGeneration(config: ODataConfig, service?: Partial<ODataServiceState> | null): boolean {
-  return service?.generation?.supported === true
-    || service?.capabilities?.sdkGeneration === true
-    || config.capabilities?.sdkGeneration === true
-    || Boolean(config.versions?.node)
+  return (service?.capabilities?.sdkGeneration ?? service?.generation?.supported ?? config.capabilities?.sdkGeneration) === true
 }
 
 export function hasGeneratedTypes(config: ODataConfig): boolean {
-  return config.capabilities?.generatedTypes === true || Boolean(config.versions?.node)
+  return config.capabilities?.generatedTypes === true
 }
 
 export function buildSchemaEndpointUrl(service: string, options: { raw?: boolean } = {}): string {

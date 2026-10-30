@@ -1,6 +1,7 @@
 import type { EntityMapping, ODataExplorerConfigResponse, ODataExplorerServiceInfo, ODataProxyConfig } from '@me-tools/odx-core'
 import process from 'node:process'
 import { defineEventHandler } from 'h3'
+import { projectExplorerDataMethods, resolveExplorerHostCapabilities } from '../utils/explorer-capabilities'
 import { enforceExplorerEndpointPolicy, isProductionExplorerRuntime } from '../utils/explorer-policy'
 import { readRuntimeMetadataSnapshot } from '../utils/metadata-refresh'
 import { tryParseMetadataSchema } from '../utils/metadata-schema'
@@ -16,6 +17,7 @@ function sanitizeServiceForProduction(service: any): ODataExplorerServiceInfo {
     isGenerated: service.isGenerated,
     version: service.version,
     metadata: service.metadata,
+    capabilities: service.capabilities,
   }
 }
 
@@ -24,6 +26,7 @@ export default defineEventHandler((event) => {
 
   const config = event.context.odataConfig as ODataProxyConfig
   const services = config.services ?? []
+  const capabilities = resolveExplorerHostCapabilities(event)
 
   const enhancedServices = services.map((svc) => {
     let entities: EntityMapping[] = []
@@ -38,6 +41,7 @@ export default defineEventHandler((event) => {
 
     return {
       ...svc,
+      capabilities: { ...capabilities, dataMethods: projectExplorerDataMethods(svc) },
       entities,
       isGenerated: false,
       version,
@@ -60,6 +64,7 @@ export default defineEventHandler((event) => {
       basePath: config.basePath || '/api/odx',
       mode: config.mode || 'sdk',
       services: enhancedServices.map(sanitizeServiceForProduction),
+      capabilities,
     } satisfies ODataExplorerConfigResponse
   }
 
@@ -67,6 +72,7 @@ export default defineEventHandler((event) => {
     basePath: config.basePath || '/api/odx',
     mode: config.mode || 'sdk',
     services: enhancedServices,
+    capabilities,
     forwardAuthHeader: config.forwardAuthHeader,
     versions: {
       node: process.version,

@@ -29,7 +29,8 @@ export default defineEventHandler(async (event) => {
   try {
     const metadata = await refreshRuntimeMetadata(event, config, matched)
 
-    if (isProductionExplorerRuntime()) {
+    const generate = event.context.odataGenerator
+    if (isProductionExplorerRuntime() || typeof generate !== 'function') {
       return {
         success: true,
         operation: 'metadata-refresh',
@@ -46,11 +47,6 @@ export default defineEventHandler(async (event) => {
         bytes: metadata.bytes,
         source: metadata.source,
       }
-    }
-
-    const generate = event.context.odataGenerator
-    if (typeof generate !== 'function') {
-      throw createError({ statusCode: 501, statusMessage: 'SDK Generation not supported by host' })
     }
 
     await generate(metadata.inputPath, outDir, matched.name)

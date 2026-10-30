@@ -759,20 +759,33 @@ diagnostic state to the local developer. In production every `/__odx__/*`
 endpoint requires validated SAP security context before returning runtime data.
 
 Production `/__odx__/config` returns only the top-level Explorer runtime fields
-`basePath`, `mode`, and `services`; each service entry is limited to `name`,
+`basePath`, `mode`, `capabilities`, and `services`; each service entry is limited to `name`,
 `route`, `icon`, `strategy`, `proxyMode`, `entities`, `isGenerated`, `version`,
-and `metadata`. The `metadata` object is limited to runtime cache state:
+`metadata`, and `capabilities`. The `metadata` object is limited to runtime cache state:
 `status`, `source`, `stale`, `staleReason`, `refreshedAt`, `timestamp`, `hash`,
 `bytes`, and optional `message`. It does not return backend URLs,
 destinations, auth, outbound headers, rules, unknown service fields, global
 secrets, runtime paths, hooks, DevTools config, `forwardAuthHeader`, or
 `versions.node`.
 
+Host `capabilities` explicitly advertises `metadataRefresh`, `sdkGeneration`,
+and `generatedTypes` (availability of the development types endpoint, not proof
+that files have been generated). SDK generation requires an injected generator
+and a development host; it is never inferred from a Node version. Service
+capabilities additionally project `dataMethods` from the existing static
+`allowOnlyMethods`/`denyMethods` rules, using their case-sensitive intersection.
+These are advisory restrictions, not authorization grants: scopes, attributes,
+path/header rules, hooks and backend permissions still run on each request.
+The projection describes the outer HTTP verb; it does not interpret batch
+parts or method tunnelling as a complete resource authorization policy.
+The direct bridge retains its existing exclusion from proxied-service rules.
+Production exposes only these derived flags/method names, never rule contents.
+
 | Endpoint | Development behavior | Current production policy |
 | --- | --- | --- |
-| `/__odx__/config` | Resolved service config, entities, versions, and generation status for DevTools inspection. | Authenticated. Returns only top-level `basePath`, `mode`, and sanitized `services` entries with entity and metadata cache state. |
+| `/__odx__/config` | Resolved service config, entities, versions, and explicit host/service capabilities for DevTools inspection. | Authenticated. Returns only top-level `basePath`, `mode`, `capabilities`, and sanitized `services` entries with entity, metadata and derived capability state. |
 | `/__odx__/logs` | Memory-backed traffic logs through `OdxLogStore` by default. `GET` supports retention-friendly filters such as `limit`, `offset`, `service`, `method`, `status`, `from`, `to`, `before`, `after`, `includePending=false`, and `order=asc\|desc`; `DELETE` clears all local logs or a bounded subset with `service`, `before`, or `to`. Logs redact secrets and bound large payloads before storage, display, export, or test use. | Authenticated. With `devtools.logStore.provider=sql`, returns and clears persisted redacted traffic logs through the `OdxLogStore` boundary. Without SQL storage, returns `[]` and rejects `DELETE`. Production payload bodies are omitted by default. |
-| `/__odx__/generate?service=<name>` | Development SDK/type regeneration for one service when the Nuxt generator is present. It refreshes metadata first, then runs `odata2ts` through the injected generator. Hosts without a generator return `501`. | Authenticated. Refreshes runtime metadata cache state only. It does not run `odata2ts` or write generated TypeScript SDK files. Responses include `operation: "metadata-refresh"`, stale state, timestamp, hash, byte count, and metadata source. |
+| `/__odx__/generate?service=<name>` | Refreshes metadata, then runs SDK generation only when the host supplies a generator. Hosts without one return a successful metadata-refresh result with `generated: false`. | Authenticated. Refreshes runtime metadata cache state only. It does not run `odata2ts` or write generated TypeScript SDK files. Responses include `operation: "metadata-refresh"`, stale state, timestamp, hash, byte count, and metadata source. |
 | `/__odx__/schema?service=<name>` | Parsed EDMX schema. `raw=true` can return XML locally. | Authenticated. Uses cached parsed metadata only and rejects raw XML. |
 | `/__odx__/types?service=<name>` | Local generated TypeScript model files. | Authenticated but disabled. Returns `403`. |
 | `/__odx__/me` | Current user info from SAP security context or local fallback. | Authenticated. Returns sanitized SAP user context and omits raw token data. |

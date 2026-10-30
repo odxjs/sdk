@@ -324,6 +324,7 @@ const actionItems = computed((): DropdownMenuItem[][] => {
 
             <UDropdownMenu :items="actionItems">
               <UButton
+                aria-label="Service actions"
                 color="neutral"
                 variant="outline"
                 icon="i-lucide-chevron-down"

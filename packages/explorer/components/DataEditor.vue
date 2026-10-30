@@ -2,12 +2,13 @@
 import type { EditorState } from '../composables/useODataState'
 import { computed, onScopeDispose, watch } from 'vue'
 import { buildEntityPreviewCacheKey, useSharedODataState } from '../composables/useODataState'
+import { permitsExplorerDataMethod } from '../utils/capabilities'
 import { assertExplorerKeyUnchanged, prepareExplorerUpdatePayload } from '../utils/recordIdentity'
 import { ExplorerRequestError, readExplorerRequestError } from '../utils/requestError'
 
 const emit = defineEmits(['refresh'])
 const editor = defineModel<EditorState>('editor', { required: true })
-const { selectedService, selectedEntity, setSessionHeaders, entityDataCache } = useSharedODataState()
+const { config, selectedService, selectedEntity, setSessionHeaders, entityDataCache } = useSharedODataState()
 const toast = useToast()
 
 let validationTimeout: ReturnType<typeof setTimeout> | null = null
@@ -102,6 +103,12 @@ async function saveItem() {
     const payload = JSON.parse(draft.json)
     if (payload === null || typeof payload !== 'object' || Array.isArray(payload))
       throw new Error('Payload must be a JSON object. No request was sent.')
+    const intent = draft.target ?? draft.requestTarget
+    if (intent) {
+      const originalService = config.value.services.find(service => service.name === intent.serviceName)
+      if (!permitsExplorerDataMethod(originalService, intent.method))
+        throw new Error(`${intent.method} is unavailable under the current host service policy. No request was sent.`)
+    }
 
     if (draft.mode === 'headers') {
       if (Object.values(payload).some(value => typeof value !== 'string'))
@@ -156,7 +163,7 @@ async function saveItem() {
     if (!target)
       throw new Error(draft.targetError || 'The original mutation target is unavailable. No request was sent.')
     const updating = draft.mode === 'update'
-    if ((updating && target.method === 'POST') || (!updating && target.method !== 'POST'))
+    if ((updating && target.method !== 'PATCH' && target.method !== 'MERGE') || (!updating && target.method !== 'POST'))
       throw new Error('The captured operation does not match this editor. No request was sent.')
     if (updating && target.key)
       assertExplorerKeyUnchanged(target.key, payload)

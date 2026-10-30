@@ -109,6 +109,7 @@ describe('explorer State Composable', () => {
 
   it('shares the entity controller and ignores an older Execute response, including its cache and loading state', async () => {
     const state = useSharedODataState()
+    state.config.value = { basePath: '/__odx__', services: [{ name: 'Northwind', route: 'northwind', entities: [{ name: 'Products' }] }] }
     state.selectedService.value = { name: 'Northwind', route: 'northwind', strategy: 'proxied' } as any
     state.selectedEntity.value = 'Products'
     await nextTick()
@@ -138,6 +139,7 @@ describe('explorer State Composable', () => {
 
   it('rejects late data and schema when switching services with the same entity name', async () => {
     const state = useSharedODataState()
+    state.config.value = { basePath: '/__odx__', services: ['Northwind', 'SAP'].map(name => ({ name, route: name.toLowerCase(), entities: [{ name: 'Products' }] })) }
     let resolveSchema!: (response: Response) => void
     vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => resolveSchema = resolve))
     state.selectedService.value = { name: 'Northwind', route: 'northwind', strategy: 'proxied' } as any
@@ -390,7 +392,7 @@ describe('explorer State Composable', () => {
     expect(services.value[0]?.metadata?.status).toBe('available')
   })
 
-  it('uses development config capabilities to keep SDK generation affordances local', () => {
+  it('uses explicit host capabilities rather than Node-version heuristics for SDK generation', () => {
     const { config } = useSharedODataState()
 
     config.value = {
@@ -399,7 +401,10 @@ describe('explorer State Composable', () => {
       versions: { node: 'v24.0.0', module: '1.0.0' },
     }
 
+    expect(supportsSdkGeneration(config.value)).toBe(false)
+    config.value.capabilities = { sdkGeneration: true }
     expect(supportsSdkGeneration(config.value)).toBe(true)
+    expect(supportsSdkGeneration(config.value, { capabilities: { sdkGeneration: false } })).toBe(false)
 
     config.value = {
       basePath: '/api/odx',
@@ -1284,6 +1289,90 @@ describe('explorer State Composable', () => {
     state.sessionHeaders.value = { 'accept': 'text/xml', 'CONTENT-TYPE': 'text/plain', 'X-Session': 'synthetic' }
     await explorer.reloadEntityData()
     expect(vi.mocked(fetch).mock.calls.at(-1)?.[1]?.headers).toEqual({ 'Accept': 'application/json;IEEE754Compatible=true', 'Content-Type': 'application/json;IEEE754Compatible=true', 'X-Session': 'synthetic' })
+  })
+
+  it('blocks record and raw writes locally when the host projects a read-only service', async () => {
+    const state = useSharedODataState()
+    const service = { name: 'Northwind', route: 'northwind', entities: [{ name: 'Products' }], capabilities: { dataMethods: ['GET'] } }
+    state.config.value = { basePath: '/api/odx', services: [service] }
+    state.selectedService.value = service as any
+    state.selectedEntity.value = 'Products'
+    const explorer = createEntityExplorer()
+    await nextTick()
+    await nextTick()
+    state.entitySchema.value = { name: 'Northwind', version: 'v4', entities: [{ name: 'Products', properties: [{ name: 'ID', type: 'Edm.Int32', isKey: true }] }] }
+    const row = { ID: 0 }
+    state.previewData.value = [row]
+    state.previewOwner.value = { serviceName: 'Northwind', entitySet: 'Products' }
+    vi.mocked(fetch).mockClear()
+    explorer.openEditor('update', row)
+    expect(explorer.editor.value.targetError).toContain('PATCH is disabled')
+    explorer.openEditor('create')
+    expect(explorer.editor.value.targetError).toContain('POST is disabled')
+    await explorer.deleteItem(row)
+    state.queryMethod.value = 'POST'
+    await explorer.refreshEntityData()
+    expect(state.previewError.value).toContain('POST is disabled')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('honors an updated config policy before the selected-service watcher has flushed', async () => {
+    const state = useSharedODataState()
+    const service = { name: 'Northwind', route: 'northwind', entities: [{ name: 'Products' }], capabilities: { dataMethods: ['GET', 'DELETE'] } }
+    state.config.value = { basePath: '/api/odx', services: [service] }
+    state.selectedService.value = service as any
+    state.selectedEntity.value = 'Products'
+    const explorer = createEntityExplorer()
+    await nextTick()
+    await nextTick()
+    state.entitySchema.value = { name: 'Northwind', version: 'v4', entities: [{ name: 'Products', properties: [{ name: 'ID', type: 'Edm.Int32', isKey: true }] }] }
+    const row = { ID: 0 }
+    state.previewData.value = [row]
+    state.previewOwner.value = { serviceName: 'Northwind', entitySet: 'Products' }
+    state.config.value = { ...state.config.value, services: [{ ...service, capabilities: { dataMethods: ['GET'] } }] }
+    expect(state.selectedService.value?.capabilities?.dataMethods).toContain('DELETE')
+    vi.mocked(fetch).mockClear()
+    await explorer.deleteItem(row)
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('permits a projected DELETE independently of PATCH availability', async () => {
+    const state = useSharedODataState()
+    const service = { name: 'Northwind', route: 'northwind', entities: [{ name: 'Products' }], capabilities: { dataMethods: ['GET', 'DELETE'] } }
+    state.config.value = { basePath: '/api/odx', services: [service] }
+    state.selectedService.value = service as any
+    state.selectedEntity.value = 'Products'
+    const explorer = createEntityExplorer()
+    await nextTick()
+    await nextTick()
+    state.entitySchema.value = { name: 'Northwind', version: 'v4', entities: [{ name: 'Products', properties: [{ name: 'ID', type: 'Edm.Int32', isKey: true }] }] }
+    const row = { ID: 0 }
+    state.previewData.value = [row]
+    state.previewOwner.value = { serviceName: 'Northwind', entitySet: 'Products' }
+    vi.stubGlobal('confirm', vi.fn(() => true))
+    vi.mocked(fetch).mockReset().mockResolvedValueOnce(new Response(null, { status: 204 })).mockResolvedValue(new Response(JSON.stringify({ value: [] })))
+    await explorer.deleteItem(row)
+    expect(vi.mocked(fetch).mock.calls[0]?.[1]?.method).toBe('DELETE')
+    expect(vi.mocked(fetch).mock.calls[1]?.[1]?.method).toBe('GET')
+  })
+
+  it('clears a denied GET preview and its pending loading state without sending a request', async () => {
+    const state = useSharedODataState()
+    const service = { name: 'Northwind', route: 'northwind', entities: [{ name: 'Products' }], capabilities: { dataMethods: ['POST'] } }
+    state.config.value = { basePath: '/api/odx', services: [service] }
+    state.selectedService.value = service as any
+    state.selectedEntity.value = 'Products'
+    const explorer = createEntityExplorer()
+    await nextTick()
+    await nextTick()
+    state.previewData.value = [{ ID: 0 }]
+    state.previewLoading.value = true
+    vi.mocked(fetch).mockClear()
+    await explorer.reloadEntityData()
+    expect(fetch).not.toHaveBeenCalled()
+    expect(state.previewData.value).toBeNull()
+    expect(state.previewLoading.value).toBe(false)
+    expect(state.previewError.value).toContain('GET is disabled')
   })
 
   it('captures the original editor target, method and headers before selection changes', async () => {

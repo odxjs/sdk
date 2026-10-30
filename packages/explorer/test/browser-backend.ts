@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { createApp, defineEventHandler, toNodeListener } from 'h3'
 import configHandler from '../../proxy/src/api/config'
+import generateHandler from '../../proxy/src/api/generate'
 import logsHandler from '../../proxy/src/api/logs'
 import schemaHandler from '../../proxy/src/api/schema'
 import { clearODataLogs, createODataHandler } from '../../proxy/src/index'
@@ -46,7 +47,7 @@ async function stop(server: Server): Promise<void> {
 }
 
 /** Actual ODX handlers and a synthetic loopback OData service; no SAP credentials. */
-export async function createExplorerBrowserBackend(options: { version?: 'v2' | 'v4', compositeKey?: boolean, secondService?: boolean, concurrency?: boolean, expanded?: boolean } = {}): Promise<ExplorerBrowserBackend> {
+export async function createExplorerBrowserBackend(options: { version?: 'v2' | 'v4', compositeKey?: boolean, secondService?: boolean, concurrency?: boolean, expanded?: boolean, readOnly?: boolean } = {}): Promise<ExplorerBrowserBackend> {
   const directory = await mkdtemp(join(tmpdir(), 'odx-explorer-browser-'))
   const version = options.version ?? 'v4'
   const edmxNamespace = version === 'v2' ? 'http://schemas.microsoft.com/ado/2007/06/edmx' : 'http://docs.oasis-open.org/odata/ns/edmx'
@@ -179,7 +180,7 @@ export async function createExplorerBrowserBackend(options: { version?: 'v2' | '
     basePath: '/api/odx',
     devtools: { enabled: true },
     services: [
-      { name: 'LocalCatalog', route: 'catalog', url: `${upstreamOrigin}/odata`, strategy: 'proxied' as const, proxyMode: 'buffer' as const },
+      { name: 'LocalCatalog', route: 'catalog', url: `${upstreamOrigin}/odata`, strategy: 'proxied' as const, proxyMode: 'buffer' as const, ...(options.readOnly ? { rules: [{ type: 'allowOnlyMethods' as const, value: ['GET'] }] } : {}) },
       ...(options.secondService ? [{ name: 'OtherCatalog', route: 'other', url: `${upstreamOrigin}/odata`, strategy: 'proxied' as const, proxyMode: 'buffer' as const }] : []),
     ],
   }
@@ -189,6 +190,7 @@ export async function createExplorerBrowserBackend(options: { version?: 'v2' | '
     event.context.odataConfig = config
   }))
   app.use('/__odx__/config', configHandler)
+  app.use('/__odx__/generate', generateHandler)
   app.use('/__odx__/schema', schemaHandler)
   app.use('/__odx__/logs', logsHandler)
   app.use('/__odx__/me', defineEventHandler(() => ({ user: { id: 'synthetic-browser' } })))

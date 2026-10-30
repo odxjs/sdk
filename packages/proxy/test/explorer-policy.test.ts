@@ -1218,6 +1218,9 @@ describe('production Explorer endpoint policy', () => {
     const server = await listenExplorerApi(config, { generator })
 
     try {
+      const capabilities = await ofetch(`${server.url}/__odx__/config`)
+      expect(capabilities.capabilities.sdkGeneration).toBe(true)
+      expect(capabilities.services[0].capabilities.sdkGeneration).toBe(true)
       const response: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`)
       const tempFile = join(rootDir, '.nuxt', 'odx', 'temp', 'RemoteService.edmx')
       const outDir = join(rootDir, '.nuxt', 'odx', 'generated', 'RemoteService')
@@ -1238,7 +1241,7 @@ describe('production Explorer endpoint policy', () => {
     }
   })
 
-  it('reports unsupported SDK generation when a non-production host has no generator', async () => {
+  it('refreshes metadata without claiming SDK generation when a development host has no generator', async () => {
     process.env.NODE_ENV = 'development'
     const rootDir = createTempRoot()
     const backend = await listenMetadataBackend()
@@ -1246,8 +1249,10 @@ describe('production Explorer endpoint policy', () => {
     const server = await listenExplorerApi(config)
 
     try {
-      await expect(ofetch(`${server.url}/__odx__/generate?service=RemoteService`)).rejects.toMatchObject({
-        status: 501,
+      expect(await ofetch(`${server.url}/__odx__/generate?service=RemoteService`)).toMatchObject({
+        success: true,
+        generated: false,
+        operation: 'metadata-refresh',
       })
       expect(existsSync(join(rootDir, '.nuxt', 'odx', 'generated'))).toBe(false)
     }
@@ -1287,8 +1292,10 @@ describe('production Explorer endpoint policy', () => {
           },
         ],
       })
-      expect(Object.keys(response).sort()).toEqual(['basePath', 'mode', 'services'])
+      expect(Object.keys(response).sort()).toEqual(['basePath', 'capabilities', 'mode', 'services'])
+      expect(response.capabilities).toEqual({ sdkGeneration: false, generatedTypes: false, metadataRefresh: true })
       expect(Object.keys(service).sort()).toEqual([
+        'capabilities',
         'entities',
         'icon',
         'isGenerated',
@@ -1330,6 +1337,7 @@ describe('production Explorer endpoint policy', () => {
 
       expect(response.forwardAuthHeader).toBe(true)
       expect(response.versions.node).toBe(process.version)
+      expect(response.capabilities).toEqual({ sdkGeneration: false, generatedTypes: true, metadataRefresh: true })
       expect(service.url).toBe('https://internal.example.test/sap/opu/odata/sap/SENSITIVE')
       expect(service.destination).toBe('SensitiveDestination')
       expect(service.auth.password).toBe('service-password')

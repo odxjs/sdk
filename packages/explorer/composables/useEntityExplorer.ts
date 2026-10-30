@@ -5,6 +5,7 @@ import { flattenOData, validateODataIdentifier } from '@me-tools/odx-core'
 import { useNuxtApp } from 'nuxt/app'
 import { onScopeDispose, toRaw } from 'vue'
 import { createAppState } from '../utils/appState'
+import { permitsExplorerDataMethod } from '../utils/capabilities'
 import { captureExplorerRecordHeaders, createExplorerEditableRecord, resolveExplorerRecordIdentity } from '../utils/recordIdentity'
 import { readExplorerRequestError } from '../utils/requestError'
 import { createExplorerJSONHeaders, isExplorerWriteMethod } from '../utils/requestTarget'
@@ -242,6 +243,10 @@ function createEntityExplorer(): EntityExplorer {
       previewError.value = 'Unsupported request method. No request was sent.'
       return Promise.resolve()
     }
+    if (!permitsExplorerDataMethod(config.value.services.find(candidate => candidate.name === service.name), queryMethod.value)) {
+      previewError.value = `${queryMethod.value} is disabled by the host service policy. No request was sent.`
+      return Promise.resolve()
+    }
     try {
       const target = Object.freeze({
         serviceName: service.name,
@@ -300,6 +305,15 @@ function createEntityExplorer(): EntityExplorer {
     const isCurrent = (): boolean => !disposed && request.isCurrent()
     const submittedQueryState = JSON.parse(JSON.stringify(queryState.value))
     const cacheKey = buildEntityPreviewCacheKey(svcName, entity)
+    if (!permitsExplorerDataMethod(config.value.services.find(candidate => candidate.name === service.name), method)) {
+      previewRequest.cancel()
+      previewLoading.value = false
+      previewError.value = 'GET is disabled by the host service policy. No request was sent.'
+      previewData.value = null
+      previewOwner.value = null
+      delete entityDataCache.value[cacheKey]
+      return
+    }
 
     previewLoading.value = true
     previewError.value = null
@@ -427,27 +441,30 @@ function createEntityExplorer(): EntityExplorer {
     )
   }
 
-  function captureMutationTarget(mode: 'create' | 'update', row: unknown): ExplorerMutationTarget {
+  function captureMutationTarget(mode: 'create' | 'update' | 'delete', row: unknown): ExplorerMutationTarget {
     const service = selectedService.value
     const entitySet = selectedEntity.value
     if (!service || !entitySet)
       throw new Error('The original service and entity are unavailable. No request was sent.')
     validateODataIdentifier(entitySet, 'Explorer entity set')
-    if (mode === 'update' && (previewOwner.value?.serviceName !== service.name
+    if (mode !== 'create' && (previewOwner.value?.serviceName !== service.name
       || previewOwner.value.entitySet !== entitySet || !previewData.value?.some(record => toRaw(record) === toRaw(row)))) {
       throw new Error('This record does not belong to the displayed service and entity. Reload data before editing. No request was sent.')
     }
-    if (mode === 'update' && entitySchema.value?.name !== service.name)
+    if (mode !== 'create' && entitySchema.value?.name !== service.name)
       throw new Error('Metadata for the original service is unavailable. No request was sent.')
-    const identity = mode === 'update' ? resolveExplorerRecordIdentity(entitySchema.value, entitySet, row) : undefined
-    const concurrency = captureExplorerRecordHeaders(mode === 'update' ? row : null, getSessionHeaders(service.name))
+    const identity = mode !== 'create' ? resolveExplorerRecordIdentity(entitySchema.value, entitySet, row) : undefined
+    const method = mode === 'create' ? 'POST' : mode === 'delete' ? 'DELETE' : identity?.version === 'v2' ? 'MERGE' : 'PATCH'
+    if (!permitsExplorerDataMethod(config.value.services.find(candidate => candidate.name === service.name), method))
+      throw new Error(`${method} is disabled by the host service policy. No request was sent.`)
+    const concurrency = captureExplorerRecordHeaders(mode !== 'create' ? row : null, getSessionHeaders(service.name))
     const headers = createExplorerJSONHeaders(concurrency.headers, identity?.version ?? (entitySchema.value?.name === service.name ? entitySchema.value.version : undefined))
     const route = service.route || service.name.toLowerCase()
     return Object.freeze({
       serviceName: service.name,
       entitySet,
       url: buildRuntimeProxyUrl(`${config.value.basePath}/${route}/${identity?.entityPath ?? entitySet}`),
-      method: mode === 'create' ? 'POST' : identity?.version === 'v2' ? 'MERGE' : 'PATCH',
+      method,
       ...concurrency,
       headers,
       ...(identity ? { key: identity.key } : {}),
@@ -512,7 +529,7 @@ function createEntityExplorer(): EntityExplorer {
 
   async function deleteItem(row: Record<string, unknown>): Promise<void> {
     try {
-      const target = captureMutationTarget('update', row)
+      const target = captureMutationTarget('delete', row)
       // eslint-disable-next-line no-alert
       if (!confirm(`Delete this record from ${target.entitySet}?`))
         return

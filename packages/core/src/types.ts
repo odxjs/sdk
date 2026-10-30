@@ -1356,6 +1356,18 @@ export interface OdxRuntimeLogStoreConfig {
   }
 }
 
+export interface ODataExplorerHostCapabilities {
+  metadataRefresh: boolean
+  sdkGeneration: boolean
+  /** Whether this host exposes the development-only generated-types endpoint. */
+  generatedTypes: boolean
+}
+
+export interface ODataExplorerServiceCapabilities extends ODataExplorerHostCapabilities {
+  /** Static method restrictions only; server hooks/auth/backend still decide. */
+  dataMethods: string[]
+}
+
 export interface ODataExplorerServiceInfo {
   name: string
   route?: string
@@ -1366,6 +1378,7 @@ export interface ODataExplorerServiceInfo {
   isGenerated?: boolean
   version?: 'v2' | 'v4' | null
   metadata?: ODataExplorerMetadataState
+  capabilities?: ODataExplorerServiceCapabilities
 }
 
 export interface ODataExplorerMetadataState {
@@ -1384,6 +1397,7 @@ export interface ODataExplorerConfigResponse {
   basePath: string
   mode: string
   services: ODataExplorerServiceInfo[]
+  capabilities?: ODataExplorerHostCapabilities
   forwardAuthHeader?: boolean
   versions?: {
     node: string

@@ -136,5 +136,21 @@ current service state before preparing another write. A known raw-request
 409/412/428 instead asks you to review its payload/headers; reloading a row does
 not automatically replace explicitly supplied raw headers.
 
+## Host capabilities
+
+The Explorer uses explicit host capabilities for metadata refresh, SDK
+generation and the development types endpoint. A Node version alone does not
+imply that an SDK generator exists. A host without one still refreshes metadata
+and reports `generated: false`.
+
+Services can project `capabilities.dataMethods` from their existing static
+method rules. The toolbar omits restricted methods and disables unavailable
+Create/Edit/Delete actions; capture and submission also recheck the known
+projection. V2 updates use MERGE availability independently of DELETE.
+Capabilities help explain the UI; they do not replace proxy/backend policy or
+predict dynamic scopes, attributes and hooks. Independent layer hosts without
+a method projection retain the previous behavior; malformed explicit lists
+fail closed. The direct bridge retains its documented policy boundaries.
+
 For documentation on the DevTools UI and debugging patterns, see the root
 documentation in this repository.
