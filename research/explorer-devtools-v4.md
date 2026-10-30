@@ -106,7 +106,27 @@ flow, two real Nuxt client starts and graceful host disposal. Its receipt is
 `c2-native-final/receipt.json` under the baseline evidence directory: no page or
 console errors, no failed browser responses, and actual host/client HMR
 connections. Twenty-one focused adapter/native-terminal cases and root
-TypeScript checking pass. The updated packed-consumer check is still pending.
+TypeScript checking pass. The final combined affected regressions pass 82/82.
+
+The updated outside-workspace packed consumer passes in 86.98 s, including
+serial package builds, four tarballs, installation, Chromium service/read/deep
+reload and actual production HTTP checks. Ordinary production output contains
+no Explorer client assets/routes; public synthetic OData remains usable and
+unauthenticated operational metadata remains denied. Resolved versions are
+Nuxt 4.6.3, Vue 3.5.44, DevTools 4.0.0 and the explicit TypeScript 5.9.3 compiler
+baseline. The fixture pins Nitro to the module's checked baseline and permits
+Devframe H3 v2 while pinning v1 consumers independently.
+
+This check required three harness corrections for the final stack: pnpm 11
+reads `PNPM_CONFIG_*` environment settings and YAML project overrides, not the
+old npm environment/package.json fields; tsx can resolve a missing consumer
+dependency back to the harness workspace, so an unhooked Node process now
+proves resolution isolation alongside the actual installed graph; and the
+browser waits for Nuxt's ready announcement instead of treating its initial
+503 startup document as the Explorer. Packing skips only repeated lifecycle
+checks after the explicit serial builds, not the consumer assertions. Its
+receipt is `installed-consumer-c2/receipt.json`; path provenance and resolved
+versions are beside it. The initial B evidence remains separate.
 
 The viewer retains visited iframe panes and initializes their document URL
 once. A restart therefore registers a fresh public `frameId` and instance URL,
@@ -587,6 +607,7 @@ The final review and initial analysis remain separate local artifacts;
 - [Devframe security](https://devfra.me/guide/security)
 - [Devframe RPC](https://devfra.me/guide/rpc)
 - [Devframe deep linking](https://devfra.me/guide/deep-linking)
+- [pnpm configuration and environment](https://pnpm.io/configuring)
 
 Upstream documentation changes independently of this audit. Verify actual
 resolved package contracts and the pinned host matrix during implementation.

@@ -9,6 +9,7 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import process from 'node:process'
+import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { promisify, stripVTControlCharacters } from 'node:util'
 import { consola } from 'consola'
@@ -33,6 +34,7 @@ async function main(): Promise<void> {
   let browser: Browser | undefined
   let page: Page | undefined
   let child: ChildProcess | undefined
+  let childClosed: Promise<void> | undefined
   let backend: Awaited<ReturnType<typeof createExplorerBrowserBackend>> | undefined
   let hostLog = ''
   let failure: string | undefined
@@ -44,11 +46,22 @@ async function main(): Promise<void> {
   async function pnpmRun(args: string[], cwd: string): Promise<string> {
     const started = performance.now()
     try {
+      const env: Record<string, string | undefined> = {
+        ...process.env,
+        CI: '1',
+        PNPM_CONFIG_IGNORE_SCRIPTS: args[0] === 'pack' ? 'true' : process.env.PNPM_CONFIG_IGNORE_SCRIPTS,
+      }
+      // A parent `pnpm run` can pin its workspace. Let every child discover
+      // the project from its explicit cwd, including the outside-repo fixture.
+      for (const key of Object.keys(env)) {
+        if (['NPM_CONFIG_WORKSPACE_DIR', 'PNPM_CONFIG_WORKSPACE_DIR'].includes(key.toUpperCase()))
+          delete env[key]
+      }
       const result = await run(process.execPath, [pnpm!, ...args], {
         cwd,
         windowsHide: true,
         maxBuffer: 10 * 1024 * 1024,
-        env: { ...process.env, npm_config_ignore_scripts: 'true', CI: '1' },
+        env,
       })
       return result.stdout
     }
@@ -58,14 +71,21 @@ async function main(): Promise<void> {
   }
 
   async function stopHost(): Promise<void> {
-    if (!child || child.exitCode !== null)
+    if (!child || !child.pid || child.exitCode !== null || child.signalCode !== null)
       return
-    const closed = new Promise<void>(resolve => child!.once('exit', () => resolve()))
-    if (process.platform === 'win32')
-      execFileSync('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true, stdio: 'ignore' })
-    else
-      child.kill('SIGTERM')
-    await closed
+    const owned = child
+    try {
+      if (process.platform === 'win32')
+        execFileSync('taskkill', ['/pid', String(owned.pid), '/t', '/f'], { windowsHide: true, stdio: 'ignore' })
+      else
+        process.kill(-owned.pid!, 'SIGTERM')
+    }
+    catch (error) {
+      if (owned.exitCode === null && owned.signalCode === null)
+        throw error
+    }
+    await Promise.race([childClosed, delay(5000)])
+    assert(owned.exitCode !== null || owned.signalCode !== null, 'The owned installed-consumer host did not stop.')
     child = undefined
   }
 
@@ -74,9 +94,11 @@ async function main(): Promise<void> {
     child = spawn(process.execPath, [cli, ...args], {
       cwd: directory,
       windowsHide: true,
+      detached: process.platform !== 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, CI: '1', NODE_ENV: production ? 'production' : 'development', NUXT_TELEMETRY_DISABLED: '1', NITRO_HOST: '127.0.0.1', NITRO_PORT: '0', PORT: '0' },
     })
+    childClosed = new Promise(resolve => child!.once('close', () => resolve()))
     return new Promise((resolve, reject) => {
       let output = ''
       const timer = setTimeout(() => reject(new Error('Installed Nuxt host did not announce its actual URL.')), 120_000)
@@ -85,7 +107,7 @@ async function main(): Promise<void> {
         output += value.toString()
         const clean = stripVTControlCharacters(output)
         const match = clean.match(RE_HOST_URL)
-        if (match) {
+        if (match && (production || clean.includes('Ready in'))) {
           clearTimeout(timer)
           resolve(match[0])
         }
@@ -154,7 +176,12 @@ async function main(): Promise<void> {
     const compiler = JSON.parse(await readFile(moduleRequire.resolve('typescript/package.json'), 'utf8'))
     overrides.vue = explorerManifest.devDependencies.vue
     overrides['@vue/compiler-sfc'] = explorerManifest.devDependencies.vue
-    overrides.h3 = '1.15.11'
+    // Match the final workspace stack without forcing Devframe's H3 v2 onto v1.
+    overrides['h3@^1'] = '1.15.11'
+    overrides['@nuxt/devtools'] = '4.0.0'
+    overrides['@devframes/agentic'] = '1.2.6'
+    const nuxtModuleManifest = JSON.parse(await readFile(join(repoRoot, 'packages/nuxt/package.json'), 'utf8'))
+    overrides.nitropack = nuxtModuleManifest.dependencies.nitropack
     overrides.pg = pg.version
     await writeFile(join(directory, 'package.json'), `${JSON.stringify({
       name: 'odx-installed-explorer-conformance',
@@ -166,8 +193,11 @@ async function main(): Promise<void> {
         'vue': explorerManifest.devDependencies.vue,
       },
       devDependencies: { typescript: compiler.version },
-      pnpm: { overrides },
     }, null, 2)}\n`)
+    // pnpm 11 reads project settings from YAML, not package.json's pnpm field.
+    // JSON is valid YAML and preserves these generated paths without escaping
+    // or an additional YAML serialization dependency.
+    await writeFile(join(directory, 'pnpm-workspace.yaml'), `${JSON.stringify({ overrides }, null, 2)}\n`)
     await pnpmRun(['install', '--ignore-scripts', '--prefer-offline'], directory)
     const require = createRequire(join(directory, 'package.json'))
     const installedRoot = dirname(require.resolve('@me-tools/odx-nuxt/package.json'))
@@ -178,15 +208,41 @@ async function main(): Promise<void> {
     const generator = JSON.parse(await readFile(generatorPath, 'utf8'))
     const sdkCompiler = JSON.parse(await readFile(generatorRequire.resolve('typescript/package.json'), 'utf8'))
     assert.equal(sdkCompiler.version, compiler.version, 'The SDK generator must use the host baseline compiler.')
-    await writeFile(join(output, 'dependency-versions.json'), `${JSON.stringify({ nuxt: explorerManifest.devDependencies.nuxt, vue: explorerManifest.devDependencies.vue, typescript: sdkCompiler.version, generator: generator.version, pg: pg.version }, null, 2)}\n`)
+    const installedNuxtPath = require.resolve('nuxt/package.json')
+    const nuxtRequire = createRequire(installedNuxtPath)
+    const resolvedNuxt = JSON.parse(await readFile(installedNuxtPath, 'utf8'))
+    const resolvedVue = JSON.parse(await readFile(require.resolve('vue/package.json'), 'utf8'))
+    const resolvedDevtools = JSON.parse(await readFile(nuxtRequire.resolve('@nuxt/devtools/package.json'), 'utf8'))
+    await writeFile(join(output, 'dependency-versions.json'), `${JSON.stringify({ nuxt: resolvedNuxt.version, vue: resolvedVue.version, devtools: resolvedDevtools.version, typescript: sdkCompiler.version, generator: generator.version, pg: pg.version }, null, 2)}\n`)
     const installedManifest = JSON.parse(await readFile(join(installedRoot, 'dist/client/manifest.json'), 'utf8'))
     assert.deepEqual(installedManifest, expectedManifest, 'The packed module must contain the freshly built Explorer client.')
     clientBuildId = installedManifest.buildId
     const installedFiles = await listClientFiles(join(installedRoot, 'dist/client'))
     delete installedFiles['manifest.json']
     assert.deepEqual(installedFiles, installedManifest.files)
-    for (const absent of ['@me-tools/odx-explorer', '@nuxt/ui', '@vue-flow/core', 'elkjs'])
-      assert.throws(() => installedRequire.resolve(`${absent}/package.json`), `${absent} must not be a runtime dependency of the installed module.`)
+    // tsx's resolver can fall back to the harness workspace for a missing
+    // package. Inspect the real consumer in an unhooked Node process instead.
+    const inspection = await run(process.execPath, ['--input-type=module', '--eval', `
+      import { createRequire } from 'node:module';
+      import { join, dirname } from 'node:path';
+      const require = createRequire(join(process.cwd(), 'package.json'));
+      const installedRoot = dirname(require.resolve('@me-tools/odx-nuxt/package.json'));
+      const installedRequire = createRequire(join(installedRoot, 'package.json'));
+      const unexpected = {};
+      for (const name of ['@me-tools/odx-explorer', '@nuxt/ui', '@vue-flow/core', 'elkjs']) {
+        try { unexpected[name] = installedRequire.resolve(name + '/package.json'); }
+        catch (error) { if (!['MODULE_NOT_FOUND', 'ERR_PACKAGE_PATH_NOT_EXPORTED'].includes(error.code)) throw error; }
+      }
+      process.stdout.write(JSON.stringify({ directory: process.cwd(), installedRoot, unexpected }));
+    `], {
+      cwd: directory,
+      windowsHide: true,
+      env: { ...process.env, NODE_OPTIONS: undefined, NODE_PATH: undefined },
+    })
+    const provenance = JSON.parse(inspection.stdout)
+    await writeFile(join(output, 'installation-provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`)
+    assert.equal(provenance.installedRoot, installedRoot)
+    assert.deepEqual(provenance.unexpected, {}, 'The installed module must not resolve the Explorer UI runtime graph.')
     assert.equal(installedPackage.dependencies['@me-tools/odx-explorer'], undefined)
     const installedGraph = await readdir(join(directory, 'node_modules/.pnpm'))
     for (const prefix of ['@me-tools+odx-explorer@', '@nuxt+ui@', '@vue-flow+core@', 'elkjs@'])
@@ -275,7 +331,9 @@ async function main(): Promise<void> {
   }
   finally {
     await browser?.close()
-    await stopHost()
+    await stopHost().catch((error: unknown) => {
+      failure ||= String(error)
+    })
     await backend?.close()
     await writeFile(join(output, 'host.log'), hostLog)
     await writeFile(join(output, 'requests.json'), `${JSON.stringify(requested, null, 2)}\n`)
