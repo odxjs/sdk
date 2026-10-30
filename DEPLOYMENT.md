@@ -84,6 +84,16 @@ each application instance has its own filesystem and locking behavior.
 Nitro package metadata, and creates an MTA archive. The root `build` command is
 reserved for the publishable npm packages.
 
+The Explorer's package build emits a verified static client using temporary
+Nuxt/Nitro outputs. Deployment therefore runs `nuxi build` in the Explorer
+package explicitly to create its standalone `.output/server` runtime; it does
+not reuse an earlier development or browser-test output. To check that build
+locally without creating an MTA archive or deploying:
+
+```bash
+pnpm --filter @me-tools/odx-explorer exec nuxi build
+```
+
 ```bash
 pnpm run build:deployment
 ```
