@@ -195,6 +195,18 @@ describe('proxy integration', () => {
     expect(response.d.results[0].Name).toBe('Test Product')
   })
 
+  it.each(['MERGE', 'PATCH', 'POST'])('does not replay a buffered %s mutation after an upstream 503', async (method) => {
+    const before = await ofetch<{ mutations: number }>(`${proxyUrl}/api/odx/TestService/RetryTrapCount`)
+    const response = await fetch(`${proxyUrl}/api/odx/TestService/RetryTrap`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ Name: 'Synthetic write' }),
+    })
+    expect(response.status).toBe(503)
+    const after = await ofetch<{ mutations: number }>(`${proxyUrl}/api/odx/TestService/RetryTrapCount`)
+    expect(after.mutations - before.mutations).toBe(1)
+  })
+
   it('preserves successful backend status in buffered responses and DevTools logs', async () => {
     clearODataLogs()
 

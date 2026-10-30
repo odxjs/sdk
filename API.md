@@ -219,6 +219,9 @@ backend-base query, then preserves that query ahead of the incoming OData query.
 The proxy parses the original, mount-relative request URL rather than H3's
 decoded routing path. Encoded delimiters inside an OData key remain part of
 that key, including `%26` and `%3F`; resource-path validation still applies.
+Buffered mutations disable transport retries, including OData V2 MERGE, so an
+uncertain upstream failure cannot silently replay a dispatched write. This is
+separate from the explicitly configured SAP CSRF token lifecycle.
 HTTP schemes are case-insensitive. Configured and Destination-provided backend
 bases reject URL userinfo and backslashes; fragments are removed before dispatch.
 

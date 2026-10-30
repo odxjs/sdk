@@ -27,6 +27,15 @@ export function createBackend(): App {
   const app = createApp()
   const router = createRouter()
   let tokenlessMutationCount = 0
+  let retryTrapMutations = 0
+
+  router.use('/RetryTrap', defineEventHandler((event) => {
+    if (event.method !== 'GET')
+      retryTrapMutations++
+    setResponseStatus(event, 503)
+    return { error: { message: 'Synthetic mutation outcome is uncertain; do not replay.' } }
+  }))
+  router.get('/RetryTrapCount', defineEventHandler(() => ({ mutations: retryTrapMutations })))
 
   router.get('/Products', defineEventHandler(() => {
     return {

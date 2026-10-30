@@ -231,6 +231,9 @@ export default defineEventHandler(async (event): Promise<any> => {
         let responseStatus = 200
         const responseData = await ofetch(targetUrl, {
           method: event.method as any,
+          // ofetch does not recognize V2 MERGE as a payload method. Never
+          // replay a dispatched mutation after a transient error or conflict.
+          ...(['GET', 'HEAD'].includes(event.method) ? {} : { retry: false as const }),
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
