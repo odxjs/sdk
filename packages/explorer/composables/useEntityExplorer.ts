@@ -44,6 +44,7 @@ export interface EntityExplorer {
 }
 
 export function useEntityExplorer(): EntityExplorer {
+  const toast = useToast()
   const {
     selectedService,
     selectedEntity,
@@ -418,7 +419,9 @@ export function useEntityExplorer(): EntityExplorer {
   }
 
   async function deleteItem(id: any): Promise<void> {
-    if (!selectedService.value || !selectedEntity.value || !id) {
+    if (!selectedService.value || !selectedEntity.value
+      || (typeof id !== 'number' && typeof id !== 'string') || id === ''
+      || (typeof id === 'number' && !Number.isFinite(id))) {
       return
     }
 
@@ -429,9 +432,13 @@ export function useEntityExplorer(): EntityExplorer {
     try {
       const route = selectedService.value.route || selectedService.value.name.toLowerCase()
       const encodedId = encodeURIComponent(String(id))
-      const res = await fetch(buildRuntimeProxyUrl(`${config.value.basePath}/${route}/${selectedEntity.value}?id=${encodedId}`), { method: 'DELETE' })
+      const res = await fetch(buildRuntimeProxyUrl(`${config.value.basePath}/${route}/${selectedEntity.value}?id=${encodedId}`), {
+        method: 'DELETE',
+        headers: { ...sessionHeaders.value },
+      })
+      if (!res.ok)
+        throw new Error(`Delete failed (${res.status} ${res.statusText || ''}).`.trim())
       if (res.ok) {
-        const toast = useToast()
         toast.add({
           title: `Item ${id} deleted successfully`,
           icon: 'i-lucide-circle-check',
@@ -441,7 +448,6 @@ export function useEntityExplorer(): EntityExplorer {
       }
     }
     catch (e: unknown) {
-      const toast = useToast()
       toast.add({
         title: (e as Error).message,
         icon: 'i-lucide-circle-x',

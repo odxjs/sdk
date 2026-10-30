@@ -104,10 +104,15 @@ async function saveItem() {
     const route = selectedService.value!.route || selectedService.value!.name.toLowerCase()
     const idKey = editor.value.original ? Object.keys(editor.value.original).find(k => k.toLowerCase() === 'id') : null
     const id = idKey ? (editor.value.original as Record<string, unknown>)[idKey] : null
+    const updating = editor.value.mode === 'update'
+    if (updating && ((typeof id !== 'number' && typeof id !== 'string')
+      || id === '' || (typeof id === 'number' && !Number.isFinite(id)))) {
+      throw new Error('Cannot update this record without a supported ID. No request was sent.')
+    }
 
-    const res = await fetch(buildRuntimeProxyUrl(`${config.value.basePath}/${route}/${selectedEntity.value}${id ? `?id=${id}` : ''}`), {
-      method: id ? 'PATCH' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await fetch(buildRuntimeProxyUrl(`${config.value.basePath}/${route}/${selectedEntity.value}${updating ? `?id=${encodeURIComponent(String(id))}` : ''}`), {
+      method: updating ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json', ...sessionHeaders.value },
       body: JSON.stringify(payload),
     })
 
@@ -127,7 +132,7 @@ async function saveItem() {
     }
 
     toast.add({
-      title: `Item ${id ? 'updated' : 'created'} successfully`,
+      title: `Item ${updating ? 'updated' : 'created'} successfully`,
       icon: 'i-lucide-circle-check',
       color: 'success',
     })

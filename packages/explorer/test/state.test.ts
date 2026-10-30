@@ -7,6 +7,10 @@ import { buildEntityPreviewCacheKey, buildOdxApiEndpoint, buildRuntimeProxyUrl, 
 // Mock global fetch
 globalThis.fetch = vi.fn()
 
+function createEntityExplorer(): ReturnType<typeof useEntityExplorer> {
+  return useNuxtApp().vueApp.runWithContext(useEntityExplorer)
+}
+
 describe('explorer State Composable', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -143,7 +147,7 @@ describe('explorer State Composable', () => {
 
   it('does not expose mock-data deletion as an Explorer state action', () => {
     expect(useSharedODataState()).not.toHaveProperty('clearEntityMockData')
-    expect(useEntityExplorer()).not.toHaveProperty('clearData')
+    expect(createEntityExplorer()).not.toHaveProperty('clearData')
   })
 
   it('builds raw metadata URLs with encoded service names and raw=true preserved', () => {
@@ -834,7 +838,7 @@ describe('explorer State Composable', () => {
   })
 
   it('serializes visual query state into an OData query string', async () => {
-    const { queryInput, queryState } = useEntityExplorer()
+    const { queryInput, queryState } = createEntityExplorer()
 
     queryState.value = {
       filters: {
@@ -857,7 +861,7 @@ describe('explorer State Composable', () => {
   })
 
   it('escapes single quotes in visual query builder string filters', async () => {
-    const { queryInput, queryState } = useEntityExplorer()
+    const { queryInput, queryState } = createEntityExplorer()
 
     queryState.value = {
       filters: {
@@ -879,7 +883,7 @@ describe('explorer State Composable', () => {
   })
 
   it('escapes string values in visual query builder function filters', async () => {
-    const { queryInput, queryState } = useEntityExplorer()
+    const { queryInput, queryState } = createEntityExplorer()
 
     queryState.value = {
       filters: {
@@ -901,7 +905,7 @@ describe('explorer State Composable', () => {
   })
 
   it('encodes ampersands inside visual query builder string filters so they are not parsed as query separators', async () => {
-    const { queryInput, queryState } = useEntityExplorer()
+    const { queryInput, queryState } = createEntityExplorer()
 
     queryState.value = {
       filters: {
@@ -946,7 +950,7 @@ describe('explorer State Composable', () => {
     await nextTick()
     await nextTick()
     entitySchema.value = schema
-    const explorer = useEntityExplorer()
+    const explorer = createEntityExplorer()
 
     explorer.queryState.value = {
       filters: {
@@ -968,7 +972,7 @@ describe('explorer State Composable', () => {
   })
 
   it('resets visual query state back to the entity browser default', async () => {
-    const { queryInput, queryState, resetQuery } = useEntityExplorer()
+    const { queryInput, queryState, resetQuery } = createEntityExplorer()
     queryState.value = {
       filters: {
         type: 'group',
@@ -1044,7 +1048,7 @@ describe('explorer State Composable', () => {
     await nextTick()
     sessionHeaders.value = { 'x-session': 'abc' }
 
-    const { previewData, refreshEntityData } = useEntityExplorer()
+    const { previewData, refreshEntityData } = createEntityExplorer()
     await refreshEntityData()
 
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/odx/northwind/Products?$select=ID&$top=1', {
@@ -1072,7 +1076,10 @@ describe('explorer State Composable', () => {
     })
   })
 
-  it('encodes delete item IDs while preserving delete success behavior', async () => {
+  it.each([
+    { id: 'A/B?x=1&R #2', encoded: 'A%2FB%3Fx%3D1%26R%20%232' },
+    { id: 0, encoded: '0' },
+  ])('encodes delete item ID $id while preserving delete success behavior', async ({ id, encoded }) => {
     vi.stubGlobal('confirm', vi.fn(() => true))
     const { config, previewData, selectedEntity, selectedService } = useSharedODataState()
     config.value = {
@@ -1107,21 +1114,21 @@ describe('explorer State Composable', () => {
         text: async () => JSON.stringify({ value: [{ ID: 'refreshed' }] }),
       })
 
-    const { deleteItem } = useEntityExplorer()
+    const { deleteItem } = createEntityExplorer()
     const nuxtApp = useNuxtApp()
-    await nuxtApp.runWithContext(() => deleteItem('A/B?x=1&R #2'))
+    await nuxtApp.runWithContext(() => deleteItem(id))
     await nextTick()
 
     expect(globalThis.fetch).toHaveBeenNthCalledWith(
       1,
-      '/api/odx/northwind-api/Products?id=A%2FB%3Fx%3D1%26R%20%232',
-      { method: 'DELETE' },
+      `/api/odx/northwind-api/Products?id=${encoded}`,
+      { method: 'DELETE', headers: {} },
     )
-    expect(nuxtApp.payload.state.$stoasts).toMatchObject([{
-      title: 'Item A/B?x=1&R #2 deleted successfully',
+    expect(nuxtApp.payload.state.$stoasts).toEqual(expect.arrayContaining([expect.objectContaining({
+      title: `Item ${id} deleted successfully`,
       icon: 'i-lucide-circle-check',
       color: 'success',
-    }])
+    })]))
     expect(globalThis.fetch).toHaveBeenNthCalledWith(2, '/api/odx/northwind-api/Products', {
       method: 'GET',
       headers: {
@@ -1130,6 +1137,30 @@ describe('explorer State Composable', () => {
       },
     })
     expect(previewData.value).toEqual([{ ID: 'refreshed' }])
+  })
+
+  it('reports failed deletes without refreshing or claiming success', async () => {
+    vi.stubGlobal('confirm', vi.fn(() => true))
+    const { config, selectedEntity, selectedService, sessionHeaders } = useSharedODataState()
+    const service = { name: 'Northwind', route: 'northwind', entities: [{ name: 'Products' }] }
+    config.value = { basePath: '/api/odx', services: [service] }
+    selectedService.value = service as any
+    selectedEntity.value = 'Products'
+    await nextTick()
+    await nextTick()
+    sessionHeaders.value = { 'X-Test-Session': 'synthetic' }
+    vi.mocked(globalThis.fetch).mockClear()
+    vi.mocked(globalThis.fetch).mockResolvedValue(new Response('', { status: 412, statusText: 'Precondition Failed' }))
+    await createEntityExplorer().deleteItem(0)
+    await nextTick()
+    expect(globalThis.fetch).toHaveBeenCalledExactlyOnceWith('/api/odx/northwind/Products?id=0', {
+      method: 'DELETE',
+      headers: { 'X-Test-Session': 'synthetic' },
+    })
+    expect(useNuxtApp().payload.state.$stoasts).toEqual(expect.arrayContaining([expect.objectContaining({
+      color: 'error',
+      title: expect.stringContaining('412'),
+    })]))
   })
 
   it('restores cached entity preview state when reselecting an entity', async () => {

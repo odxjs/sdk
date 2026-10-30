@@ -54,12 +54,17 @@ export async function createExplorerBrowserBackend(): Promise<ExplorerBrowserBac
     requests.push({ method: request.method, url: request.url, body: Buffer.concat(chunks).toString(), sessionHeader: request.headers['x-odx-browser-session'] })
     response.setHeader('Content-Type', 'application/json')
     if (request.method !== 'GET') {
+      if (request.url !== '/odata/Products(0)' || !['PATCH', 'DELETE'].includes(request.method || '')) {
+        response.statusCode = 405
+        response.end(JSON.stringify({ error: { message: 'Unsupported fixture mutation target.' } }))
+        return
+      }
       response.end(JSON.stringify({ ID: 0, Name: 'Synthetic write accepted' }))
       return
     }
     response.end(JSON.stringify({ value: request.url?.includes('Suppliers')
       ? [{ ID: 'S1', Name: 'Browser supplier' }]
-      : [{ ID: 0, Name: 'Zero desk' }, { ID: 1, Name: 'Desk' }] }))
+      : [{ ID: 0, Name: 'Zero desk' }, { ID: 1, Name: 'Desk' }, { Name: 'Unkeyed desk' }] }))
   })
   const upstreamOrigin = await listen(upstream)
   const config = {

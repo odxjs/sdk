@@ -43,5 +43,15 @@ SAP credentials. `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` can select an existing
 compatible Chromium installation; otherwise Playwright uses its installed
 default. Set `ODX_EXPLORER_BROWSER_EVIDENCE=1` to keep local journey screenshots.
 
+## Record editing
+
+The editor's selected operation determines whether it creates or updates a
+record. An update without a supported single ID reports an error and sends no
+request; it cannot fall back to creating a record. Numeric ID `0` is supported,
+IDs are URL-encoded, and session headers apply to updates and deletion as well
+as reads. Failed deletion reports an error instead of claiming success.
+This path still uses the proxy's existing single-ID compatibility rewrite;
+metadata-derived composite keys and entity ETags are separate migration work.
+
 For documentation on the DevTools UI and debugging patterns, see the root
 documentation in this repository.
