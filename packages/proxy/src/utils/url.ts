@@ -160,8 +160,11 @@ export interface ODataRequestInfo {
  * @returns Parsed OData request info.
  */
 export function parseODataRequest(event: H3Event, basePath = '/api/odx'): ODataRequestInfo {
-  const queryIndex = event.path.indexOf('?')
-  const pathOnly = queryIndex === -1 ? event.path : event.path.slice(0, queryIndex)
+  // H3 decodes some reserved characters into event.path before dispatching.
+  // Its layer-relative Node URL retains the original key/query boundaries.
+  const requestPath = event.node?.req?.url ?? event.path
+  const queryIndex = requestPath.indexOf('?')
+  const pathOnly = queryIndex === -1 ? requestPath : requestPath.slice(0, queryIndex)
   const normalizedBasePath = normalizeODataProxyBasePath(basePath)
   if (pathOnly !== normalizedBasePath && !pathOnly.startsWith(`${normalizedBasePath}/`)) {
     throw new TypeError('The request path is outside the configured ODX proxy basePath.')
@@ -176,7 +179,7 @@ export function parseODataRequest(event: H3Event, basePath = '/api/odx'): ODataR
   return {
     serviceName: segments[0] || 'unknown',
     odataPath: segments.slice(1).join('/'),
-    query: queryIndex === -1 ? '' : event.path.slice(queryIndex),
+    query: queryIndex === -1 ? '' : requestPath.slice(queryIndex),
     segments,
   }
 }

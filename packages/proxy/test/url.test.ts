@@ -1,4 +1,4 @@
-import { createEvent } from 'h3'
+import { createApp, createEvent, defineEventHandler, toWebHandler } from 'h3'
 import { describe, expect, it } from 'vitest'
 import {
   normalizeODataProxyBasePath,
@@ -126,6 +126,27 @@ describe('oData URL Utilities', () => {
         serviceName: 'TestService',
         odataPath: 'Products(\'A%2FB\')',
       })
+    })
+
+    it('retains opaque key characters through actual H3 path decoding', async () => {
+      const path = '/api/odx/catalog/Products(ID=0,Tenant=\'O\'\'Brien%2F%26%3F%23%25\')?$select=Name&$top=1'
+      const app = createApp()
+      app.use(defineEventHandler(event => parseODataRequest(event, '/api/odx')))
+      const response = await toWebHandler(app)(new Request(`http://localhost:3000${path}`))
+      expect(await response.json()).toMatchObject({
+        serviceName: 'catalog',
+        odataPath: 'Products(ID=0,Tenant=\'O\'\'Brien%2F%26%3F%23%25\')',
+        query: '?$select=Name&$top=1',
+      })
+    })
+
+    it('keeps raw key characters after a parent H3 mount strips its prefix', async () => {
+      const child = createApp()
+      child.use(defineEventHandler(event => parseODataRequest(event, '/api/odx')))
+      const parent = createApp()
+      parent.use('/console', child.handler)
+      const response = await toWebHandler(parent)(new Request('http://localhost:3000/console/api/odx/catalog/Products(\'A%26B%3FC\')?$top=1'))
+      expect(await response.json()).toMatchObject({ serviceName: 'catalog', odataPath: 'Products(\'A%26B%3FC\')', query: '?$top=1' })
     })
 
     it('retains encoded spaces inside an OData function string literal', () => {
