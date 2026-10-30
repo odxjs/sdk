@@ -22,5 +22,15 @@ Run the Explorer package tests without the full workspace test suite:
 pnpm --filter @me-tools/odx-explorer run verify
 ```
 
+The same state and layer tests also run from the workspace root:
+
+```bash
+pnpm exec vitest run packages/explorer/test
+```
+
+The Explorer declares a Nuxt Vitest workspace project with a package-relative
+root. Its state tests use that project's existing Nuxt app context instead of
+creating a competing application. Browser journeys are verified separately.
+
 For documentation on the DevTools UI and debugging patterns, see the root
 documentation in this repository.

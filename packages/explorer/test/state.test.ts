@@ -1,6 +1,6 @@
-import { createNuxtApp } from 'nuxt/app'
+import { useNuxtApp } from 'nuxt/app'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createApp, nextTick } from 'vue'
+import { nextTick } from 'vue'
 import { useEntityExplorer } from '../composables/useEntityExplorer'
 import { buildEntityPreviewCacheKey, buildOdxApiEndpoint, buildRuntimeProxyUrl, buildSchemaEndpointUrl, supportsSdkGeneration, useSharedODataState } from '../composables/useODataState'
 
@@ -10,6 +10,8 @@ globalThis.fetch = vi.fn()
 describe('explorer State Composable', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(globalThis.fetch).mockReset()
+    vi.mocked(globalThis.fetch).mockImplementation(async () => new Response(JSON.stringify({ entities: [] })))
     globalThis.localStorage?.clear()
     const {
       activeTab,
@@ -1106,10 +1108,7 @@ describe('explorer State Composable', () => {
       })
 
     const { deleteItem } = useEntityExplorer()
-    const nuxtApp = createNuxtApp({
-      vueApp: createApp({}),
-      payload: { config: { public: {}, app: {} }, state: {} },
-    } as any)
+    const nuxtApp = useNuxtApp()
     await nuxtApp.runWithContext(() => deleteItem('A/B?x=1&R #2'))
     await nextTick()
 

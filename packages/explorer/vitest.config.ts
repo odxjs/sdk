@@ -1,9 +1,15 @@
-import { defineVitestConfig } from '@nuxt/test-utils/config'
+import { fileURLToPath } from 'node:url'
+import { defineVitestProject } from '@nuxt/test-utils/config'
 
-export default defineVitestConfig({
+const rootDir = fileURLToPath(new URL('.', import.meta.url))
+
+export default defineVitestProject({
+  root: rootDir,
   test: {
     name: 'explorer',
-    environment: 'happy-dom',
     include: ['test/**/*.test.ts'],
+    environmentOptions: {
+      nuxt: { rootDir },
+    },
   },
 })
