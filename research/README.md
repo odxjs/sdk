@@ -7,6 +7,8 @@ root-level project documentation.
 
 ## Active research
 
+- [`explorer-devtools-v4.md`](./explorer-devtools-v4.md) - current Explorer audit,
+  Opus-reviewed serving/state boundaries and the staged Nuxt DevTools v4 plan.
 - [`nuxt-fiori/`](./nuxt-fiori/) - metadata-driven Smart Components and a
   possible Nuxt Fiori application framework built on ODX.
 - [`evlog-observability-evaluation.md`](./evlog-observability-evaluation.md) -
