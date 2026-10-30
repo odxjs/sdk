@@ -234,11 +234,10 @@ export default defineEventHandler(async (event): Promise<any> => {
           // ofetch does not recognize V2 MERGE as a payload method. Never
           // replay a dispatched mutation after a transient error or conflict.
           ...(['GET', 'HEAD'].includes(event.method) ? {} : { retry: false as const }),
-          headers: {
+          headers: mergeHeaders({
             'Accept': 'application/json',
             'Content-Type': 'application/json',
-            ...finalHeaders,
-          },
+          }, finalHeaders),
           body: requestBody ?? await readProxyRequestBody(event),
           dispatcher: connectivityRequest.dispatcher,
           async onResponse({ response }) {

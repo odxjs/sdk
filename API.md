@@ -222,6 +222,9 @@ that key, including `%26` and `%3F`; resource-path validation still applies.
 Buffered mutations disable transport retries, including OData V2 MERGE, so an
 uncertain upstream failure cannot silently replay a dispatched write. This is
 separate from the explicitly configured SAP CSRF token lifecycle.
+Buffered JSON defaults merge case-insensitively with incoming negotiation
+headers, preserving parameters such as `IEEE754Compatible=true` without
+combining them with a second default Content-Type value.
 HTTP schemes are case-insensitive. Configured and Destination-provided backend
 bases reject URL userinfo and backslashes; fragments are removed before dispatch.
 

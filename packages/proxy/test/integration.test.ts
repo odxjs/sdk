@@ -195,6 +195,14 @@ describe('proxy integration', () => {
     expect(response.d.results[0].Name).toBe('Test Product')
   })
 
+  it('preserves IEEE754 content negotiation without duplicate default header values', async () => {
+    const type = 'application/json;IEEE754Compatible=true'
+    const response = await fetch(`${proxyUrl}/api/odx/TestService/HeaderEcho`, { headers: { 'Accept': type, 'Content-Type': type } })
+    const body = await response.json()
+    expect(body.receivedHeaders.accept).toBe(type)
+    expect(body.receivedHeaders['content-type']).toBe(type)
+  })
+
   it.each(['MERGE', 'PATCH', 'POST'])('does not replay a buffered %s mutation after an upstream 503', async (method) => {
     const before = await ofetch<{ mutations: number }>(`${proxyUrl}/api/odx/TestService/RetryTrapCount`)
     const response = await fetch(`${proxyUrl}/api/odx/TestService/RetryTrap`, {
