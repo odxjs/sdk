@@ -10,8 +10,8 @@ describe('explorer Nuxt layer', () => {
     const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
     expect(manifest.dependencies.nuxt).toBeUndefined()
     expect(manifest.dependencies.vue).toBeUndefined()
-    expect(manifest.peerDependencies).toMatchObject({ nuxt: '^4.4.8', vue: '^3.5.39' })
-    expect(manifest.devDependencies).toMatchObject({ nuxt: '4.4.8', vue: '3.5.39' })
+    expect(manifest.peerDependencies).toMatchObject({ nuxt: '^4.6.3', vue: '^3.5.44' })
+    expect(manifest.devDependencies).toMatchObject({ nuxt: '4.6.3', vue: '3.5.44' })
   })
 
   it('resolves its stylesheet from the package instead of the consumer root', async () => {

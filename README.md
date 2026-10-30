@@ -121,7 +121,7 @@ exposes an opaque `delta` cursor. `listDelta()` and `fetchDelta()` retrieve
 subsequent changes without trusting a backend-provided origin or resource path.
 
 ## 🛠️ Development
-The supported toolchain is Node.js 22 or 24 with pnpm 10 or 11. The repository
+The workspace toolchain is Node.js 22.22.3+ or 24.15+ with pnpm 11.28.9+. The repository
 pins the pnpm version used by CI through `packageManager`.
 
 

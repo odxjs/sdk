@@ -12,6 +12,11 @@ function createEntityExplorer(): ReturnType<typeof useEntityExplorer> {
 }
 
 describe('explorer State Composable', () => {
+  it('bootstraps its Nuxt test app without initialization errors', () => {
+    const error = useNuxtApp().payload.error
+    expect(error, error?.cause instanceof Error ? error.cause.stack : error?.message).toBeFalsy()
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(globalThis.fetch).mockReset()

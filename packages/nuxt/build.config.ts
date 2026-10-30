@@ -1,3 +1,5 @@
+import { deepStrictEqual } from 'node:assert'
+import { createHash } from 'node:crypto'
 import { cp, readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
@@ -44,5 +46,3 @@ export default defineBuildConfig({
     },
   },
 })
-import { deepStrictEqual } from 'node:assert'
-import { createHash } from 'node:crypto'

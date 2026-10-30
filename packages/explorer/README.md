@@ -10,8 +10,13 @@ pnpm add @me-tools/odx-explorer
 
 ## Verification
 
+The initial unpublished Explorer release targets Nuxt 4.6.3+, Vue 3.5.44+ and
+Node 22.22.3+ or 24.15+ within the supported Node 22/24 lines. Its repository
+toolchain pins pnpm 11.28.9. Older layer-host combinations are not claimed by
+this upgrade; the portable OData packages retain their independent contracts.
+
 Explorer is a Nuxt layer: its consumer supplies compatible Nuxt 4 and Vue 3
-peer dependencies (`nuxt >=4.4.8 <5`, `vue >=3.5.39 <4`). It does not install a
+peer dependencies (`nuxt >=4.6.3 <5`, `vue >=3.5.44 <4`). It does not install a
 second framework runtime below the layer. Standalone repository builds retain
 their pinned development versions; an application extending the published
 layer uses its own framework installation.

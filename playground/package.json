@@ -3,6 +3,6 @@
   "private": true,
   "devDependencies": {
     "@me-tools/odx-nuxt": "workspace:*",
-    "@nuxt/ui": "^4.9.0"
+    "@nuxt/ui": "^4.12.0"
   }
 }

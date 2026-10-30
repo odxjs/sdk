@@ -73,6 +73,72 @@ directory. The latter records commands, timings and source/output fingerprints;
 the resolved versions are beside it in `dependency-versions.json`.
 Nuxt/UI/Vite/DevTools workspace versions remain unchanged until slice C.
 
+### C implementation decisions
+
+The next bounded change updates the primary Nuxt host to 4.6.3, Kit/Schema to
+the same version, Test Utils to 4.3.4 and Module Builder to 1.0.3. The initial
+separate Nuxt update exposed a real bootstrap failure: Nuxt UI 4.9 calls
+`injectHead().hooks.hookOnce`, removed by Nuxt 4.6's Unhead 3. A regression test
+now checks the Nuxt app initialization error explicitly. Upgrade Nuxt UI to
+4.12 in the same coherent stack change, including the Docus consumer (whose
+declared UI range already permits 4.12).
+The registry confirms that Nuxt 4.6.3 requires Vue `^3.5.44` and Node
+`^22.22.3 || ^24.15.0 || >=26.0.0`; the workspace will retain its supported
+22/24 lines with those updated patch floors and synchronize Vue/compiler-SFC
+at 3.5.44. Node 26 is outside this migration. Remote Node guidance must move
+from 24.11 to 24.15. Framework-neutral packages retain their independent
+runtime contracts.
+
+The workspace now pins pnpm 11.28.9. The new peer graph reproducibly stalled
+under pnpm 10.33; the pnpm 11 resolution seeded from the clean B lockfile
+completed in 28.2 seconds and its frozen install in 355 ms. Full fresh
+resolution was deliberately discarded to retain unrelated locked versions.
+Both intermediate task-generated lockfiles are preserved with the local
+evidence. No supply-chain policy was disabled and no release-age exclusions
+were added. The scoped H3 override pins v1 consumers to 1.15.11 while allowing
+Devframe's H3 v2 dependency. Hub/Devframe's exact agentic peer is aligned at
+1.2.6. Explicit root/docs parser providers satisfy their modern host scope;
+Content-scoped older parser peers remain an upstream limitation. The proposed
+unctx dependency extension did not resolve those peers and was removed after
+Opus review.
+
+Observed remaining peer warnings concern Content-scoped unctx parser versions,
+Vue DevTools' lagging Vite DevTools range, CLI `cac` ranges, mkdist's optional
+SFC transformer and floating-vue's optional Kit range. These are not a clean
+peer-check claim. Keep the actual application/build/browser evidence distinct
+from these warnings rather than broadly suppressing them.
+
+On the upgraded stack, 64 affected controller/delivery tests pass in 16.92 s,
+Explorer typecheck passes, and all eight production Chromium journeys pass in
+92.89 s (`c1-upgraded-regressions.json`, `c1-browser.json`). The earlier eight
+browser journeys took 44.45 s; both totals include build/setup and are not an
+isolated startup benchmark. Native dock and packed-host checks still belong
+to the following adapter slice. Opus reviewed selected upgrade sources with
+no tools or writes (`opus-c1-stack.json`).
+The affected Docus host prepares successfully. Workspace TypeScript now also
+passes after declaring the Vue and Nitro development inputs previously
+available through hoisting; the Nuxt module declares its existing Vue runtime
+requirement as a host peer, without raising it above the previous Vue 3.5.39
+baseline. Changed-file lint and final frozen install pass.
+
+The native dock integration will require DevTools v4. This is an explicit
+prepublication UI compatibility decision: on a v3 host, the new ready hook
+does not fire and no native dock is registered. No permanent deprecated-tab
+implementation will be introduced. Transport APIs and the independent layer
+remain separate; this decision is not a Nuxt 5 migration or a removal of
+non-DevTools consumption. The independently consumed, unpublished Explorer
+layer now declares Nuxt `^4.6.3` and Vue `^3.5.44`; retain its default export
+and avoid claiming an unverified older host range. The transport module's
+independent compatibility contract is not raised merely for its developer UI.
+
+Primary references refreshed on 2026-10-30:
+[Nuxt 4.6.3](https://github.com/nuxt/nuxt/releases/tag/v4.6.3),
+[DevTools v4 host requirements](https://nuxt.com/modules/devtools/upgrading-to-v4),
+and [module migration](https://nuxt.com/modules/devtools/module-migration).
+The official module guide explicitly describes the non-registering v3-host
+behavior. Keep the lockfile and use the documented DevTools override on Nuxt 4;
+do not follow the upgrade page's generic lockfile-deletion suggestion.
+
 ## Recommendation
 
 Keep Nuxt UI and the existing Explorer product surface. Modernize its serving

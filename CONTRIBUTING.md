@@ -168,10 +168,11 @@ final summary.
 
 ### Remote Linux and Codex Cloud
 
-Use Node 24.11+ (24.x) for the shared ODX/Fiori remote development environment.
+Use Node 24.15+ (24.x) for the shared ODX/Fiori remote development environment.
+The Nuxt 4.6 host requires Node 22.22.3+ on the supported 22.x line.
 This does not remove the supported Node 22 local/CI matrix. Install ODX with its
-own pinned manager, currently `corepack pnpm@10.33.0 install --frozen-lockfile`,
-then run `corepack pnpm@10.33.0 dev:prepare`. Do not reuse Windows dependency or
+own pinned manager, currently `corepack pnpm@11.28.9 install --frozen-lockfile`,
+then run `corepack pnpm@11.28.9 dev:prepare`. Do not reuse Windows dependency or
 build directories in Linux. Ordinary fixture work needs no real SAP service,
 release token, personal desktop tooling or published ODX packages.
 

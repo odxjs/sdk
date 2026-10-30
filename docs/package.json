@@ -24,10 +24,11 @@
   },
   "devDependencies": {
     "@me-tools/odx-nuxt": "workspace:*",
-    "@nuxt/schema": "^4.4.8",
+    "@nuxt/schema": "^4.6.3",
     "@nuxtjs/i18n": "^10.4.0",
     "jiti": "^2.7.0",
-    "nuxt": "^4.4.8",
+    "nuxt": "^4.6.3",
+    "oxc-parser": "0.140.0",
     "untyped": "^2.0.0"
   }
 }

@@ -2,6 +2,11 @@
 
 The official Nuxt module for the ODX ecosystem. It provides type-safe OData composables, automated SDK generation, and native DevTools integration.
 
+The initial unpublished package now requires Node 22.22.3+ or 24.15+ within
+Node 22/24, matching its Nuxt Kit 4.6 toolchain. The workspace pins pnpm
+11.28.9. This tooling update does not replace the framework-neutral core or
+proxy runtime contracts.
+
 Nuxt auto-imports `useOData` in application code. Nitro server routes use
 explicit request-context-aware read and mutation services instead of rebuilding
 proxy paths or calling an upstream origin directly:
