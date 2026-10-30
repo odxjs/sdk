@@ -1271,12 +1271,13 @@ describe('explorer State Composable', () => {
     await nextTick()
     state.entitySchema.value = { name: 'Northwind', version: 'v2', entities: [{ name: 'Products', properties: [{ name: 'Code', type: 'Edm.String', isKey: true }] }] }
     state.sessionHeaders.value = { 'X-Test-Session': 'original' }
-    const row = { Code: 'A/B', ID: 999 }
+    const row = { 'Code': 'A/B', 'ID': 999, '@odata.etag': 'W/"captured"' }
     state.previewData.value = [row]
     state.previewOwner.value = { serviceName: 'Northwind', entitySet: 'Products' }
     explorer.openEditor('update', row)
     const target = explorer.editor.value.target
     row.Code = 'changed'
+    row['@odata.etag'] = 'W/"later"'
     state.selectedService.value = { name: 'Other', route: 'other' } as any
     state.selectedEntity.value = 'Suppliers'
     state.sessionHeaders.value = { 'X-Test-Session': 'replacement' }
@@ -1285,8 +1286,11 @@ describe('explorer State Composable', () => {
       entitySet: 'Products',
       url: '/api/odx/northwind/Products(\'A%2FB\')',
       method: 'MERGE',
-      headers: { 'X-Test-Session': 'original' },
+      headers: { 'X-Test-Session': 'original', 'If-Match': 'W/"captured"', 'Accept': 'application/json', 'Content-Type': 'application/json' },
+      etag: 'W/"captured"',
       key: { 'version': 'v2', '@odata.key': [{ field: 'Code', type: 'Edm.String', value: 'A/B' }] },
+      originalJson: JSON.stringify({ 'Code': 'A/B', 'ID': 999, '@odata.etag': 'W/"captured"' }),
+      navigationProperties: [],
     })
     expect(Object.isFrozen(target)).toBe(true)
     expect(Object.isFrozen(target?.headers)).toBe(true)
@@ -1365,7 +1369,7 @@ describe('explorer State Composable', () => {
     expect(globalThis.fetch).toHaveBeenNthCalledWith(
       1,
       `/api/odx/northwind-api/${path}`,
-      { method: 'DELETE', headers: {} },
+      { method: 'DELETE', headers: { 'Accept': 'application/json;IEEE754Compatible=true', 'Content-Type': 'application/json;IEEE754Compatible=true' } },
     )
     expect(nuxtApp.payload.state.$stoasts).toEqual(expect.arrayContaining([expect.objectContaining({
       title: 'Record deleted from Products',
@@ -1404,7 +1408,7 @@ describe('explorer State Composable', () => {
     await nextTick()
     expect(globalThis.fetch).toHaveBeenCalledExactlyOnceWith('/api/odx/northwind/Products(0)', {
       method: 'DELETE',
-      headers: { 'X-Test-Session': 'synthetic' },
+      headers: { 'X-Test-Session': 'synthetic', 'Accept': 'application/json;IEEE754Compatible=true', 'Content-Type': 'application/json;IEEE754Compatible=true' },
     })
     expect(useNuxtApp().payload.state.$stoasts).toEqual(expect.arrayContaining([expect.objectContaining({
       color: 'error',

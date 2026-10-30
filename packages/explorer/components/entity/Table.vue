@@ -9,7 +9,7 @@ const {
   previewError,
   showLoadingIndicator,
   entitySchemaLoading,
-  refreshEntityData,
+  reloadEntityData,
   openEditor,
   deleteItem,
   isNavigationProperty,
@@ -129,7 +129,7 @@ function getRowData(row: any): Record<string, any> {
               variant="soft"
               size="md"
               class="px-8 font-bold"
-              @click="refreshEntityData"
+              @click="reloadEntityData"
             />
           </template>
 

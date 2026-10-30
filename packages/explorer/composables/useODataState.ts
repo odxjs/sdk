@@ -97,6 +97,7 @@ export interface EditorState {
   original: any
   context?: string
   headersServiceName?: string
+  conflict?: boolean
   target?: ExplorerMutationTarget
   targetError?: string
 }

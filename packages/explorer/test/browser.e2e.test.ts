@@ -109,11 +109,12 @@ describe('explorer real browser usage', async () => {
       await expect.poll(() => editor.count()).toBe(0)
       const row = page.getByRole('row').filter({ hasText: 'Zero desk' })
       await row.getByRole('button', { name: 'Edit record', exact: true }).click()
+      await editor.locator('textarea').fill(JSON.stringify({ ID: 0, Name: 'Zero desk updated' }))
       await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
       await expect.poll(() => editor.count()).toBe(0)
       const update = backend.requests.find(request => request.method === 'PATCH')
       expect(update).toMatchObject({ url: '/odata/Products(0)', sessionHeader: 'synthetic-session' })
-      expect(JSON.parse(update!.body)).toMatchObject({ ID: 0, Name: 'Zero desk' })
+      expect(JSON.parse(update!.body)).toEqual({ Name: 'Zero desk updated' })
       page.once('dialog', async dialog => dialog.accept())
       await row.getByRole('button', { name: 'Delete record', exact: true }).click()
       await expect.poll(() => backend.requests.some(request => request.method === 'DELETE')).toBe(true)
@@ -175,6 +176,7 @@ describe('explorer real browser usage', async () => {
       const editor = page.getByRole('dialog')
       const method = version === 'v2' ? 'MERGE' : 'PATCH'
       await expect.poll(() => editor.getByText(method, { exact: true }).isVisible()).toBe(true)
+      await editor.locator('textarea').fill(JSON.stringify({ Name: 'Zero desk updated' }))
       await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
       await expect.poll(() => editor.count()).toBe(0)
       const suffix = version === 'v2' ? 'L' : ''
@@ -218,6 +220,7 @@ describe('explorer real browser usage', async () => {
       })
       await page.getByRole('row').filter({ hasText: 'Zero desk' }).getByRole('button', { name: 'Edit record', exact: true }).click()
       const editor = page.getByRole('dialog')
+      await editor.locator('textarea').fill(JSON.stringify({ Name: 'Zero desk pending' }))
       await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
       await dispatched
       await editor.getByRole('button', { name: 'Cancel', exact: true }).click()
@@ -225,7 +228,7 @@ describe('explorer real browser usage', async () => {
       const nextRow = page.getByRole('row').filter({ has: page.getByRole('cell', { name: 'Desk', exact: true }) })
       await nextRow.getByRole('button', { name: 'Edit record', exact: true }).click()
       release()
-      await expect.poll(() => page.getByText(status === 200 ? 'Item updated successfully' : 'Synthetic late conflict', { exact: true }).isVisible()).toBe(true)
+      await expect.poll(() => page.getByText(status === 200 ? 'Item updated successfully' : 'Request conflict (HTTP 409). Reload data before retrying. Synthetic late conflict', { exact: true }).isVisible()).toBe(true)
       await expect.poll(() => editor.isVisible()).toBe(true)
       expect(JSON.parse(await editor.locator('textarea').inputValue())).toMatchObject({ ID: 1, Name: 'Desk' })
       if (status === 200) {
@@ -242,6 +245,128 @@ describe('explorer real browser usage', async () => {
       release()
       await page.unrouteAll({ behavior: 'wait' })
       await context.close()
+    }
+  })
+
+  it('does not dispatch an unchanged row as a write', async () => {
+    const { context, page, errors } = await openExplorer('pointer')
+    try {
+      await page.getByRole('row').filter({ hasText: 'Zero desk' }).getByRole('button', { name: 'Edit record', exact: true }).click()
+      await page.getByRole('dialog').getByRole('button', { name: 'Save Changes', exact: true }).click()
+      await expect.poll(() => page.getByRole('dialog').count()).toBe(0)
+      await expect.poll(() => page.getByText('No changes to save', { exact: true }).isVisible()).toBe(true)
+      expect(backend.requests.every(request => request.method === 'GET')).toBe(true)
+      expect(errors).toEqual([])
+    }
+    finally {
+      await page.unrouteAll({ behavior: 'wait' })
+      await context.close()
+    }
+  })
+
+  it('invalidates the original preview cache when a dispatched write finishes after entity navigation', async () => {
+    const { context, page, errors } = await openExplorer('pointer')
+    let release!: () => void
+    const released = new Promise<void>(resolve => release = resolve)
+    let captured!: () => void
+    const dispatched = new Promise<void>(resolve => captured = resolve)
+    try {
+      await page.route('**/api/odx/catalog/Products*', async (route) => {
+        if (route.request().method() !== 'PATCH') {
+          await route.fallback()
+          return
+        }
+        const response = await route.fetch({ url: `${backend.origin}/api/odx/catalog/Products(0)` })
+        captured()
+        await released
+        await route.fulfill({ response })
+      })
+      await page.getByRole('row').filter({ hasText: 'Zero desk' }).getByRole('button', { name: 'Edit record', exact: true }).click()
+      const editor = page.getByRole('dialog')
+      await editor.locator('textarea').fill(JSON.stringify({ Name: 'Changed while away' }))
+      await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
+      await dispatched
+      await editor.getByRole('button', { name: 'Cancel', exact: true }).click()
+      await page.getByText('Suppliers', { exact: true }).filter({ visible: true }).first().click()
+      await page.getByRole('button', { name: 'Execute', exact: true }).click()
+      await expect.poll(() => page.getByRole('row').filter({ hasText: 'Browser supplier' }).isVisible()).toBe(true)
+      release()
+      await expect.poll(() => page.getByText('Item updated successfully', { exact: true }).isVisible()).toBe(true)
+      await page.getByText('Products', { exact: true }).filter({ visible: true }).first().click()
+      await expect.poll(() => page.getByText('No data loaded yet', { exact: true }).isVisible()).toBe(true)
+      expect(await page.getByRole('row').filter({ hasText: 'Zero desk' }).count()).toBe(0)
+      await page.getByRole('button', { name: 'Execute', exact: true }).click()
+      await expect.poll(() => page.getByRole('row').filter({ hasText: 'Changed while away' }).isVisible()).toBe(true)
+      expect(errors).toEqual([])
+    }
+    finally {
+      release()
+      await page.unrouteAll({ behavior: 'wait' })
+      await context.close()
+    }
+  })
+
+  it.each(['v2', 'v4'] as const)('preserves a conflicted draft and reloads fresh %s ETags before updating and deleting', async (version) => {
+    const contract = await createExplorerBrowserBackend({ version, concurrency: true, expanded: version === 'v4' })
+    let opened: Awaited<ReturnType<typeof openExplorer>> | undefined
+    try {
+      opened = await openExplorer('keyboard', undefined, contract)
+      const { page, errors } = opened
+      const editor = page.getByRole('dialog')
+      if (version === 'v4') {
+        await page.getByPlaceholder('?id=... or ?$filter=...').fill('?$expand=Supplier')
+        await page.getByRole('button', { name: 'Execute', exact: true }).click()
+        await expect.poll(() => contract.requests.some(request => request.url === '/odata/Products?$expand=Supplier')).toBe(true)
+      }
+      await page.getByRole('button', { name: 'Headers', exact: true }).click()
+      await editor.getByRole('textbox').fill(JSON.stringify({ 'IF-MATCH': '*' }))
+      await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
+      await expect.poll(() => editor.count()).toBe(0)
+      await page.getByRole('row').filter({ hasText: 'Zero desk' }).getByRole('button', { name: 'Edit record', exact: true }).click()
+      expect(JSON.parse(await editor.locator('textarea').inputValue())).not.toHaveProperty('Supplier')
+      const draft = { Name: 'My preserved draft' }
+      if (version === 'v4') {
+        await editor.locator('textarea').fill(JSON.stringify({ Supplier: { ID: 'S1', Name: 'Wrong deep update' } }))
+        await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
+        await expect.poll(() => editor.getByText('Edit navigation records separately. No request was sent.', { exact: true }).isVisible()).toBe(true)
+        expect(contract.requests.every(request => request.method === 'GET')).toBe(true)
+      }
+      await editor.locator('textarea').fill(JSON.stringify(draft))
+      contract.advanceRecord()
+      await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
+      await expect.poll(() => editor.getByText(/Request conflict \(HTTP 412\).*The record changed on the service/).isVisible()).toBe(true)
+      expect(JSON.parse(await editor.locator('textarea').inputValue())).toEqual(draft)
+      const method = version === 'v2' ? 'MERGE' : 'PATCH'
+      expect(contract.requests.filter(request => request.method === method).map(request => request.ifMatch)).toEqual(['W/"1"'])
+      expect(await page.getByRole('row').filter({ hasText: 'My preserved draft' }).count()).toBe(0)
+      if (process.env.ODX_EXPLORER_BROWSER_EVIDENCE === '1') {
+        const directory = fileURLToPath(new URL('../../../.artifacts/explorer-baseline-2026-10-30/journeys/', import.meta.url))
+        await mkdir(directory, { recursive: true })
+        await page.screenshot({ path: `${directory}/${version}-conflict.png` })
+      }
+      await editor.getByRole('button', { name: 'Discard draft and reload', exact: true }).click()
+      await expect.poll(() => editor.count()).toBe(0)
+      const refreshed = page.getByRole('row').filter({ hasText: 'Server desk' })
+      await expect.poll(() => refreshed.isVisible()).toBe(true)
+      await refreshed.getByRole('button', { name: 'Edit record', exact: true }).click()
+      await editor.locator('textarea').fill(JSON.stringify({ 'Name': 'Fresh successful update', '@odata.etag': '*' }))
+      await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
+      await expect.poll(() => editor.count()).toBe(0)
+      const updated = page.getByRole('row').filter({ hasText: 'Fresh successful update' })
+      await expect.poll(() => updated.isVisible()).toBe(true)
+      const writes = contract.requests.filter(request => request.method === method)
+      expect(writes.map(request => request.ifMatch)).toEqual(['W/"1"', 'W/"2"'])
+      expect(JSON.parse(writes[1]!.body)).toEqual({ Name: 'Fresh successful update' })
+      page.once('dialog', async dialog => dialog.accept())
+      await updated.getByRole('button', { name: 'Delete record', exact: true }).click()
+      await expect.poll(() => updated.count()).toBe(0)
+      expect(contract.requests.find(request => request.method === 'DELETE')?.ifMatch).toBe('W/"3"')
+      expect(errors.filter(error => !error.includes('status of 412'))).toEqual([])
+    }
+    finally {
+      await opened?.page.unrouteAll({ behavior: 'wait' })
+      await opened?.context.close()
+      await contract.close()
     }
   })
 

@@ -1,10 +1,13 @@
 import type { ODataTypedKey, ODataTypedKeyPart } from '@me-tools/odx-core'
 import { createODataEntityPath, createODataTypedKey, formatODataKey } from '@me-tools/odx-core'
 
+const RE_ENTITY_TAG = /^(?:W\/)?"[\x21\x23-\x7E\x80-\xFF]*"$/
+
 export interface ExplorerRecordIdentity {
   readonly entityPath: string
   readonly key: ODataTypedKey
   readonly version: 'v2' | 'v4'
+  readonly navigationProperties: readonly string[]
 }
 
 export interface ExplorerMutationTarget {
@@ -14,6 +17,54 @@ export interface ExplorerMutationTarget {
   readonly method: 'POST' | 'PATCH' | 'MERGE'
   readonly headers: Readonly<Record<string, string>>
   readonly key?: ODataTypedKey
+  readonly etag?: string
+  readonly originalJson?: string
+  readonly navigationProperties?: readonly string[]
+}
+
+/** Only changed structural fields belong in a record update, never expansions. */
+export function prepareExplorerUpdatePayload(target: ExplorerMutationTarget, payload: Record<string, unknown>): Record<string, unknown> {
+  const original: unknown = target.originalJson ? JSON.parse(target.originalJson) : null
+  if (!isRecord(original))
+    throw new Error('The original record snapshot is unavailable. No request was sent.')
+  const changed: Record<string, unknown> = {}
+  for (const [field, value] of Object.entries(payload)) {
+    if (field === '__metadata' || field.startsWith('@') || field.startsWith('#'))
+      continue
+    const unchanged = Object.hasOwn(original, field) && JSON.stringify(value) === JSON.stringify(original[field])
+    if (target.navigationProperties?.includes(field)) {
+      if (!unchanged)
+        throw new Error('Edit navigation records separately. No request was sent.')
+      continue
+    }
+    if (!unchanged)
+      changed[field] = value
+  }
+  return changed
+}
+
+/** A row editor shows structural values; the View action retains the full row. */
+export function createExplorerEditableRecord(row: Record<string, unknown>, navigationProperties: readonly string[]): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(row).filter(([field]) => field !== '__metadata'
+    && !field.startsWith('@') && !field.startsWith('#') && !navigationProperties.includes(field)))
+}
+
+/** Prefer the row's concurrency token over any generic session override. */
+export function captureExplorerRecordHeaders(row: unknown, sessionHeaders: Record<string, string>): { headers: Readonly<Record<string, string>>, etag?: string } {
+  const metadata = isRecord(row) && isRecord(row.__metadata) ? row.__metadata : undefined
+  const value = isRecord(row) ? row['@odata.etag'] ?? metadata?.etag : undefined
+  const headers = { ...sessionHeaders }
+  if (value === undefined || value === null)
+    return { headers: Object.freeze(headers) }
+  if (typeof value !== 'string' || !RE_ENTITY_TAG.test(value.trim()))
+    throw new Error('The record ETag is invalid. Reload data before editing. No request was sent.')
+  const etag = value.trim()
+  for (const name of Object.keys(headers)) {
+    if (name.toLowerCase() === 'if-match')
+      delete headers[name]
+  }
+  headers['If-Match'] = etag
+  return { headers: Object.freeze(headers), etag }
 }
 
 /** A partial update can omit keys, but cannot change its captured identity. */
@@ -62,5 +113,8 @@ export function resolveExplorerRecordIdentity(schema: unknown, entitySet: string
     return { field: property.name, type: property.type, value }
   })
   const key = createODataTypedKey(parts, schema.version)
-  return Object.freeze({ entityPath: createODataEntityPath(entitySet, key), key, version: schema.version })
+  const navigationProperties = Object.freeze((Array.isArray(entity.navigationProperties) ? entity.navigationProperties : [])
+    .filter((property: unknown): property is Record<string, unknown> => isRecord(property) && typeof property.name === 'string')
+    .map(property => String(property.name)))
+  return Object.freeze({ entityPath: createODataEntityPath(entitySet, key), key, version: schema.version, navigationProperties })
 }

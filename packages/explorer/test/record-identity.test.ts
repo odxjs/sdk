@@ -1,11 +1,36 @@
 import { describe, expect, it } from 'vitest'
-import { assertExplorerKeyUnchanged, resolveExplorerRecordIdentity } from '../utils/recordIdentity'
+import { assertExplorerKeyUnchanged, captureExplorerRecordHeaders, createExplorerEditableRecord, prepareExplorerUpdatePayload, resolveExplorerRecordIdentity } from '../utils/recordIdentity'
 
 function schema(version: 'v2' | 'v4', keys: [string, string][]) {
   return { version, entities: [{ name: 'Records', properties: keys.map(([name, type]) => ({ name, type, isKey: true })) }] }
 }
 
 describe('metadata-owned Explorer record identity', () => {
+  it('sends only changed structural fields and rejects deep updates to expanded navigation', () => {
+    const original = { 'ID': 0, 'Name': 'Old name', 'Price': 10, 'Supplier': { ID: 'S1', Name: 'Expanded supplier' }, '@odata.etag': 'W/"1"' }
+    const target = { serviceName: 'Catalog', entitySet: 'Products', url: '/api/Products(0)', method: 'PATCH' as const, headers: {}, originalJson: JSON.stringify(original), navigationProperties: Object.freeze(['Supplier']) }
+    expect(createExplorerEditableRecord(original, ['Supplier'])).toEqual({ ID: 0, Name: 'Old name', Price: 10 })
+    expect(prepareExplorerUpdatePayload(target, { ...original, 'Name': 'Changed name', '@odata.etag': '*' })).toEqual({ Name: 'Changed name' })
+    expect(prepareExplorerUpdatePayload(target, { ID: 0, Name: 'Old name' })).toEqual({})
+    expect(() => prepareExplorerUpdatePayload(target, { Supplier: { ID: 'S1', Name: 'Overwrite related record' } })).toThrow('Edit navigation records separately')
+    original.Price = 99
+    expect(prepareExplorerUpdatePayload(target, { Price: 10 })).toEqual({})
+  })
+
+  it.each([{ '@odata.etag': 'W/"1"' }, { __metadata: { etag: 'W/"1"' } }])('freezes the original row ETag and replaces case-insensitive wildcard overrides', (row) => {
+    const session = { 'if-match': '*', 'IF-MATCH': '*', 'X-Session': 'synthetic' }
+    const target = captureExplorerRecordHeaders(row, session)
+    session['X-Session'] = 'changed'
+    expect(target).toEqual({ headers: { 'If-Match': 'W/"1"', 'X-Session': 'synthetic' }, etag: 'W/"1"' })
+    expect(Object.isFrozen(target.headers)).toBe(true)
+  })
+
+  it('leaves services without ETags usable and rejects malformed row tokens', () => {
+    expect(captureExplorerRecordHeaders({}, {})).toEqual({ headers: {} })
+    for (const etag of ['*', 'unquoted', 'W/"one"\r\nX-Test: bad', 42])
+      expect(() => captureExplorerRecordHeaders({ '@odata.etag': etag }, {})).toThrow('record ETag is invalid')
+  })
+
   it.each(['Edm.Int64', 'Edm.Decimal'])('rejects an already rounded numeric %s key and preserves its exact string form', (type) => {
     const metadata = schema('v4', [['Number', type]])
     const rounded: unknown = JSON.parse('{"Number":9007199254740993}')

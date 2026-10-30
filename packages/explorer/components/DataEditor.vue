@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import type { EditorState } from '../composables/useODataState'
 import { computed, onScopeDispose, watch } from 'vue'
-import { useSharedODataState } from '../composables/useODataState'
-import { assertExplorerKeyUnchanged } from '../utils/recordIdentity'
+import { buildEntityPreviewCacheKey, useSharedODataState } from '../composables/useODataState'
+import { assertExplorerKeyUnchanged, prepareExplorerUpdatePayload } from '../utils/recordIdentity'
+import { ExplorerRequestError, readExplorerRequestError } from '../utils/requestError'
 
 const emit = defineEmits(['refresh'])
 const editor = defineModel<EditorState>('editor', { required: true })
-const { selectedService, selectedEntity, setSessionHeaders } = useSharedODataState()
+const { selectedService, selectedEntity, setSessionHeaders, entityDataCache } = useSharedODataState()
 const toast = useToast()
 
 let validationTimeout: ReturnType<typeof setTimeout> | null = null
@@ -90,6 +91,7 @@ async function saveItem() {
   const draft = editor.value
   draft.loading = true
   draft.error = null
+  draft.conflict = false
 
   try {
     const payload = JSON.parse(draft.json)
@@ -123,27 +125,22 @@ async function saveItem() {
       throw new Error('The captured operation does not match this editor. No request was sent.')
     if (updating && target.key)
       assertExplorerKeyUnchanged(target.key, payload)
+    const body = updating ? prepareExplorerUpdatePayload(target, payload) : payload
+    if (updating && Object.keys(body).length === 0) {
+      toast.add({ title: 'No changes to save', color: 'neutral' })
+      draft.show = false
+      return
+    }
     const res = await fetch(target.url, {
       method: target.method,
-      headers: { 'Content-Type': 'application/json', ...target.headers },
-      body: JSON.stringify(payload),
+      headers: target.headers,
+      body: JSON.stringify(body),
     })
 
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => '')
-      let msg = `Server Error ${res.status}`
-      try {
-        const errData = JSON.parse(errorText)
-        msg = errData.message || errData.statusMessage || msg
-      }
-      catch {
-        if (errorText && errorText.length < 100) {
-          msg = errorText
-        }
-      }
-      throw new Error(msg)
-    }
+    if (!res.ok)
+      throw await readExplorerRequestError(res)
 
+    delete entityDataCache.value[buildEntityPreviewCacheKey(target.serviceName, target.entitySet)]
     toast.add({
       title: `Item ${updating ? 'updated' : 'created'} successfully`,
       icon: 'i-lucide-circle-check',
@@ -155,6 +152,7 @@ async function saveItem() {
       emit('refresh')
   }
   catch (e: unknown) {
+    draft.conflict = e instanceof ExplorerRequestError && e.conflict
     if (e instanceof SyntaxError) {
       draft.error = formatJsonError(e)
     }
@@ -180,6 +178,16 @@ async function saveItem() {
  */
 function close() {
   editor.value.show = false
+}
+
+const canReloadOriginal = computed(() => selectedService.value?.name === editor.value.target?.serviceName
+  && selectedEntity.value === editor.value.target?.entitySet)
+
+function discardAndReload() {
+  if (!canReloadOriginal.value)
+    return
+  editor.value.show = false
+  emit('refresh')
 }
 </script>
 
@@ -244,6 +252,14 @@ function close() {
 
     <template v-if="editor.mode !== 'view' && editor.mode !== 'response'" #footer>
       <div class="flex items-center justify-end gap-3 w-full">
+        <UButton
+          v-if="editor.conflict"
+          label="Discard draft and reload"
+          color="neutral"
+          variant="outline"
+          :disabled="!canReloadOriginal || editor.loading"
+          @click="discardAndReload"
+        />
         <UButton
           label="Cancel"
           color="neutral"

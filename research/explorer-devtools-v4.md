@@ -40,6 +40,34 @@ browser fixture itself exercises integer/string keys. Explorer typecheck and
 changed-file lint passed. Entity ETags and conflict-specific recovery follow
 as D2.
 
+### D2: ETags, safe update bodies and conflicts
+
+Record updates/deletes now preserve their captured ETag in `If-Match`, replacing
+generic session overrides case-insensitively. V2 metadata tokens survive core
+flattening. Invalid row tokens fail closed; no automatic wildcard is invented
+for services without ETags. The editor keeps drafts on HTTP 409/412/428 and
+offers an explicit discard-and-GET-reload action. Late outcomes remain scoped
+to their own editor, and every successful mutation invalidates its original
+entity cache even after navigation away.
+
+Opus's D2 review identified full-row/deep-update and stale-cache risks. The
+editor now snapshots the original record, displays structural fields, sends
+only changed values and rejects navigation edits. Unchanged saves send no
+write. Expanded entities remain available through View. JSON/IEEE754 negotiation
+is captured on writes as well as reads. Eighty focused state/key/error cases,
+root and Explorer typechecks, and changed-file lint pass. All 18 freshly built
+production Chromium journeys pass, including V2/V4 412 recovery followed by a
+fresh-token update/delete, a V4 `$expand` without a deep update, a no-op save,
+late success/failure, and cross-entity cache invalidation. The V4 fixture rejects
+incorrect negotiation rather than silently accepting it.
+
+Two additional real transport defects were repaired in granular proxy commits:
+`f3ab31b` disables automatic buffered mutation retries, including MERGE (which
+ofetch does not recognize as a payload method); `ea146f7` merges JSON defaults
+case-insensitively so Accept/Content-Type values are not duplicated. The latter
+has a failing-before/passing-after HTTP contract. The focused proxy/header run
+passes 39 cases. These remain synthetic local contracts, not SAP/BTP acceptance.
+
 ### Earlier baseline and native integration
 
 The executable baseline/controller work is implemented in local commits

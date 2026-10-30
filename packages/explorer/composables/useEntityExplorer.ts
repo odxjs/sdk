@@ -5,7 +5,8 @@ import { flattenOData, validateODataIdentifier } from '@me-tools/odx-core'
 import { useNuxtApp } from 'nuxt/app'
 import { onScopeDispose, toRaw } from 'vue'
 import { createAppState } from '../utils/appState'
-import { resolveExplorerRecordIdentity } from '../utils/recordIdentity'
+import { captureExplorerRecordHeaders, createExplorerEditableRecord, resolveExplorerRecordIdentity } from '../utils/recordIdentity'
+import { readExplorerRequestError } from '../utils/requestError'
 import { buildEntityPreviewCacheKey, buildRuntimeProxyUrl } from './useODataState'
 
 const RE_TRAILING_SLASH = /\/$/
@@ -445,14 +446,27 @@ function createEntityExplorer(): EntityExplorer {
     if (mode === 'update' && entitySchema.value?.name !== service.name)
       throw new Error('Metadata for the original service is unavailable. No request was sent.')
     const identity = mode === 'update' ? resolveExplorerRecordIdentity(entitySchema.value, entitySet, row) : undefined
+    const concurrency = captureExplorerRecordHeaders(mode === 'update' ? row : null, getSessionHeaders(service.name))
+    const jsonType = identity?.version === 'v4' || (entitySchema.value?.name === service.name && entitySchema.value.version === 'v4')
+      ? 'application/json;IEEE754Compatible=true'
+      : 'application/json'
+    const headers = { ...concurrency.headers }
+    for (const name of Object.keys(headers)) {
+      if (name.toLowerCase() === 'accept' || name.toLowerCase() === 'content-type')
+        delete headers[name]
+    }
+    headers.Accept = jsonType
+    headers['Content-Type'] = jsonType
     const route = service.route || service.name.toLowerCase()
     return Object.freeze({
       serviceName: service.name,
       entitySet,
       url: buildRuntimeProxyUrl(`${config.value.basePath}/${route}/${identity?.entityPath ?? entitySet}`),
       method: mode === 'create' ? 'POST' : identity?.version === 'v2' ? 'MERGE' : 'PATCH',
-      headers: Object.freeze({ ...getSessionHeaders(service.name) }),
+      ...concurrency,
+      headers: Object.freeze(headers),
       ...(identity ? { key: identity.key } : {}),
+      ...(identity ? { originalJson: JSON.stringify(row), navigationProperties: identity.navigationProperties } : {}),
     })
   }
 
@@ -490,6 +504,8 @@ function createEntityExplorer(): EntityExplorer {
     if (mode === 'create' || mode === 'update') {
       try {
         target = captureMutationTarget(mode, row)
+        if (mode === 'update')
+          initialJson = JSON.stringify(createExplorerEditableRecord(row, target.navigationProperties ?? []), null, 2)
       }
       catch (error) {
         targetError = error instanceof Error ? error.message : 'The record identity is unavailable. No request was sent.'
@@ -520,8 +536,9 @@ function createEntityExplorer(): EntityExplorer {
         headers: target.headers,
       })
       if (!res.ok)
-        throw new Error(`Delete failed (${res.status} ${res.statusText || ''}).`.trim())
+        throw await readExplorerRequestError(res)
       if (res.ok) {
+        delete entityDataCache.value[buildEntityPreviewCacheKey(target.serviceName, target.entitySet)]
         toast.add({
           title: `Record deleted from ${target.entitySet}`,
           icon: 'i-lucide-circle-check',

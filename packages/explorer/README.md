@@ -88,8 +88,13 @@ ambiguous or unsafe numeric identities block a write; updates never become
 creates. Large Int64/Decimal keys must arrive as exact strings rather than
 rounded JavaScript numbers; reads with known V4 metadata request
 `IEEE754Compatible=true`. Fractional Decimal keys also require exact strings.
-Partial updates may omit keys, but cannot change
-the captured identity.
+Partial updates may omit keys, but cannot change the captured identity.
+
+The editor sends only structural fields changed from its original snapshot.
+Expanded navigation records stay available through View and are excluded from
+the row editor. Attempting to add/change a navigation property blocks the
+request; edit that related record separately. Saving an unchanged row sends no
+write. JSON negotiation, including V4 IEEE754 parameters, is retained on writes.
 
 Session header overrides belong to their selected service and apply to reads,
 updates and deletes. Configured server outbound headers are not copied into
@@ -97,7 +102,17 @@ the browser's editable override set. Closing an editor does not cancel an
 already dispatched write: its outcome remains visible without closing or
 overwriting a newer editor. Automatic reloads always use GET, independently of
 the raw request selector. Deletion failures report an error instead of claiming
-success. Entity ETags and conflict-specific recovery remain migration work.
+success. Successful writes invalidate the original entity's cache even after
+navigation to another entity.
+
+When a row supplies an ETag, updates and deletes carry that captured token in
+`If-Match`. Generic session overrides cannot replace it with a wildcard, and
+editing JSON annotations cannot change it. Services without row ETags remain
+usable; the Explorer does not invent `If-Match: *` or claim optimistic
+concurrency for them. HTTP 409/412/428 preserves the draft and explains the
+conflict. Use **Discard draft and reload** to explicitly abandon it and fetch
+current data before reopening the record. The Explorer does not automatically
+retry a conflicted write or silently overwrite the record.
 
 For documentation on the DevTools UI and debugging patterns, see the root
 documentation in this repository.
