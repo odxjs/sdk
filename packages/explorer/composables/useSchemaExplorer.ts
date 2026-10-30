@@ -45,7 +45,6 @@ function createSchemaExplorer(): SchemaExplorer {
   onScopeDispose(() => {
     disposed = true
     layoutVersion++
-    elk.terminateWorker()
     if (typeof document !== 'undefined')
       document.removeEventListener('fullscreenchange', syncFullscreen)
     schemaData.value = null
