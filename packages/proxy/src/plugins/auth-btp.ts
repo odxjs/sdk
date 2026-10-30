@@ -3,7 +3,8 @@ import process from 'node:process'
 import xsenv from '@sap/xsenv'
 import { createSecurityContext, XsuaaService } from '@sap/xssec'
 import { createError } from 'h3'
-import { defineNitroPlugin } from 'nitropack/runtime'
+import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
+import { getApplicationRequestPath } from '../utils/application-base'
 
 /**
  * Nitro plugin to enforce SAP XSUAA authentication using the modern XsuaaService class.
@@ -25,8 +26,9 @@ export default defineNitroPlugin((nitro) => {
   }
 
   nitro.hooks.hook('request', async (event) => {
+    const path = getApplicationRequestPath(event.path, useRuntimeConfig(event).app?.baseURL)
     // Only protect /api and /__odx__ routes
-    if (!event.path.startsWith('/api/') && !event.path.startsWith('/__odx__/')) {
+    if (!path.startsWith('/api/') && !path.startsWith('/__odx__/')) {
       return
     }
 

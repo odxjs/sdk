@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer'
 import process from 'node:process'
 import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
+import { getApplicationRequestPath } from '../utils/application-base'
 import { isSafeHttpBackendUrl, looksLikeHttpBackendUrl } from '../utils/backend-url'
 import { assertLocalProxyFallbackAllowed, isLocalBtpFallbackAllowed, resolveBtpDestination } from '../utils/btp-destination'
 import { findODataServiceByRoute } from '../utils/service-route'
@@ -46,11 +47,12 @@ export default defineNitroPlugin((nitro) => {
     event.context.odataConfig = config
 
     const basePath = config.basePath || '/api/odx'
-    if (!event.path.startsWith(basePath)) {
+    const path = getApplicationRequestPath(event.path, runtimeConfig.app?.baseURL)
+    if (path !== basePath && !path.startsWith(`${basePath}/`)) {
       return
     }
 
-    const pathOnly = event.path.split(RE_QUERY_SPLIT)[0] || ''
+    const pathOnly = path.split(RE_QUERY_SPLIT)[0] || ''
     const relativePath = pathOnly.slice(basePath.length).replace(RE_LEADING_SLASH, '')
     const segments = relativePath.split('/').filter(Boolean)
     const serviceRoute = segments[0]

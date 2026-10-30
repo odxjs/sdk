@@ -50,6 +50,12 @@ identity, while production `/__odx__` runtime APIs require SAP security context
 before returning config, schema, logs, generation status, type artifacts, or
 user information.
 
+Nitro request hooks normalize the configured application base before matching
+protected routes or resolving OData targets. A host mounted at `/console/`
+therefore validates `/console/api/*` and `/console/__odx__/*` through the same
+SAP security adapter. The normalization preserves the original request and
+requires a segment boundary; `/console-other/` is not the configured base.
+
 If authentication behavior changes, update `xs-security.json`,
 `packages/approuter/xs-app.json`, and this file together.
 

@@ -12,10 +12,10 @@ import { resolveBtpDestination } from '../src/utils/btp-destination'
 import { resolveProxyTarget } from '../src/utils/target'
 import { listenOnLoopback } from './fixtures/listen'
 
-const runtime = vi.hoisted(() => ({ config: undefined as ODataProxyConfig | undefined }))
+const runtime = vi.hoisted(() => ({ config: undefined as ODataProxyConfig | undefined, appBase: '/' }))
 vi.mock('nitropack/runtime', () => ({
   defineNitroPlugin: (plugin: unknown) => plugin,
-  useRuntimeConfig: () => ({ odata: runtime.config }),
+  useRuntimeConfig: () => ({ odata: runtime.config, app: { baseURL: runtime.appBase } }),
 }))
 vi.mock('../src/utils/btp-destination', async importOriginal => ({
   ...await importOriginal<typeof import('../src/utils/btp-destination')>(),
@@ -62,7 +62,32 @@ afterEach(async () => {
     })
   }
   runtime.config = undefined
+  runtime.appBase = '/'
   vi.unstubAllEnvs()
+})
+
+describe('nitro application base', () => {
+  it.each([
+    ['/console/api/odx/Catalog/Products', true],
+    ['/console-other/api/odx/Catalog/Products', false],
+    ['/console/api/odx-other/Catalog/Products', false],
+    ['/api/odx/Catalog/Products', true],
+  ])('resolves only the app-local proxy route: %s', async (path, expected) => {
+    runtime.appBase = '/console/'
+    runtime.config = { basePath: '/api/odx', buildDir: '.', rootDir: '.', mode: 'sdk', services: [{ name: 'Catalog', url: 'https://backend.example/odata' }] }
+    let requestHook!: (event: H3Event) => Promise<void>
+    targetPlugin({
+      hooks: {
+        hook(_name: string, callback: typeof requestHook) {
+          requestHook = callback
+        },
+      },
+    } as any)
+    const event = { path, headers: new Headers(), context: {} } as unknown as H3Event
+    await requestHook(event)
+    expect(Boolean(event.context.proxyTarget)).toBe(expected)
+    expect(event.path).toBe(path)
+  })
 })
 
 describe.each(['standalone', 'nitro'] as const)('%s proxy global defaults', (entry) => {
