@@ -300,7 +300,7 @@ describe('explorer State Composable', () => {
 
     await refreshServiceMetadata('R&D #1?')
 
-    expect(globalThis.fetch).toHaveBeenCalledWith('/__odx__/generate?service=R%26D%20%231%3F')
+    expect(globalThis.fetch).toHaveBeenCalledWith('/__odx__/generate?service=R%26D%20%231%3F', { method: 'POST' })
   })
 
   it('does not expose mock-data deletion as an Explorer state action', () => {
@@ -388,8 +388,34 @@ describe('explorer State Composable', () => {
       operation: 'metadata-refresh',
       generated: false,
     })
-    expect(globalThis.fetch).toHaveBeenNthCalledWith(1, '/__odx__/generate?service=RemoteService')
+    expect(globalThis.fetch).toHaveBeenNthCalledWith(1, '/__odx__/generate?service=RemoteService', { method: 'POST' })
     expect(services.value[0]?.metadata?.status).toBe('available')
+  })
+
+  it('reconciles refreshed metadata after SDK failure without losing the selected entity', async () => {
+    const state = useSharedODataState()
+    const service = { name: 'RemoteService', route: 'remote', entities: [{ name: 'Products' }], metadata: { status: 'available', hash: 'old' } }
+    state.config.value = { basePath: '/api/odx', services: [service] }
+    state.selectedService.value = service as any
+    state.selectedEntity.value = 'Products'
+    await nextTick()
+    await nextTick()
+    const updated = { ...service, metadata: { status: 'available', hash: 'new' } }
+    vi.mocked(fetch).mockReset().mockImplementation(async (input) => {
+      if (String(input).includes('/generate'))
+        return new Response(JSON.stringify({ data: { metadataRefreshed: true, operation: 'sdk-generation', generated: false, service: 'RemoteService', stale: false, error: 'Synthetic generation failed' } }), { status: 500 })
+      if (String(input).includes('/config'))
+        return new Response(JSON.stringify({ basePath: '/api/odx', services: [updated] }))
+      return new Response(JSON.stringify({ name: 'RemoteService', version: 'v4', entities: [{ name: 'Products', properties: [{ name: 'NewField' }] }] }))
+    })
+    await expect(state.refreshServiceMetadata('RemoteService')).rejects.toMatchObject({ metadataRefreshed: true, stale: false, message: 'Synthetic generation failed' })
+    await nextTick()
+    await nextTick()
+    expect(state.selectedEntity.value).toBe('Products')
+    expect(state.selectedService.value?.metadata?.hash).toBe('new')
+    expect(state.entitySchema.value?.entities[0]?.properties).toEqual([{ name: 'NewField' }])
+    expect(state.generatingStatus.value.RemoteService).toBe(false)
+    expect(vi.mocked(fetch).mock.calls.filter(([input]) => String(input).includes('/generate'))).toHaveLength(1)
   })
 
   it('uses explicit host capabilities rather than Node-version heuristics for SDK generation', () => {

@@ -131,6 +131,35 @@ describe('explorer real browser usage', async () => {
     }
   })
 
+  it('shows refreshed fields and schema when metadata succeeds but SDK generation fails', async () => {
+    const contract = await createExplorerBrowserBackend({ generatorFailure: true })
+    let opened: Awaited<ReturnType<typeof openExplorer>> | undefined
+    try {
+      opened = await openExplorer('pointer', undefined, contract)
+      const { page, errors } = opened
+      expect(await page.getByRole('columnheader', { name: 'UpdatedField', exact: true }).count()).toBe(0)
+      await page.getByRole('button', { name: 'Service actions', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'Regenerate SDK', exact: true }).click()
+      await expect.poll(() => page.getByText('Metadata refreshed; SDK generation failed', { exact: true }).isVisible()).toBe(true)
+      await expect.poll(() => page.getByRole('columnheader', { name: 'UpdatedField', exact: true }).isVisible()).toBe(true)
+      await page.getByRole('tab', { name: 'Schema', exact: true }).click()
+      await expect.poll(() => page.locator('.vue-flow__node').filter({ hasText: 'UpdatedField' }).isVisible()).toBe(true)
+      await expect.poll(() => page.locator('.vue-flow').evaluate(element => getComputedStyle(element.parentElement!).opacity)).toBe('1')
+      expect(contract.requests.filter(request => request.url === '/odata/$metadata')).toHaveLength(1)
+      expect(errors.filter(error => !error.includes('status of 500'))).toEqual([])
+      if (process.env.ODX_EXPLORER_BROWSER_EVIDENCE === '1') {
+        const directory = fileURLToPath(new URL('../../../.artifacts/explorer-baseline-2026-10-30/journeys/', import.meta.url))
+        await mkdir(directory, { recursive: true })
+        await page.screenshot({ path: `${directory}/metadata-generation-partial.png` })
+      }
+    }
+    finally {
+      await opened?.page.unrouteAll({ behavior: 'wait' })
+      await opened?.context.close()
+      await contract.close()
+    }
+  })
+
   it('reviews a raw request body before dispatch and shows the actual response', async () => {
     const { context, page, errors } = await openExplorer('pointer')
     try {

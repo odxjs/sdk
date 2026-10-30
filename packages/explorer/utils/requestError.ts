@@ -9,6 +9,15 @@ function readMessage(value: unknown): string | undefined {
     return readMessage(value.value)
 }
 
+export class ExplorerGenerationError extends Error {
+  readonly metadataRefreshed = true
+
+  constructor(message: string, readonly stale: boolean) {
+    super(message)
+    this.name = 'ExplorerGenerationError'
+  }
+}
+
 export class ExplorerRequestError extends Error {
   readonly conflict: boolean
 

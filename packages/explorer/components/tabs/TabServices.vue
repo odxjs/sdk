@@ -93,19 +93,30 @@ const refreshActionIcon = computed(() => {
 async function onRefreshMetadata() {
   if (!selectedService.value)
     return
+  const serviceName = selectedService.value.name
   try {
-    const result = await refreshServiceMetadata(selectedService.value.name)
+    const result = await refreshServiceMetadata(serviceName)
     toast.add({
       id: 'gen-success',
       title: result?.generated ? 'SDK Regenerated' : 'Metadata Refreshed',
       description: result?.generated
-        ? `Types for ${selectedService.value.name} were regenerated from current metadata.`
-        : `Runtime metadata for ${selectedService.value.name} is up to date.`,
+        ? `Types for ${serviceName} were regenerated from current metadata.`
+        : `Runtime metadata for ${serviceName} is up to date.`,
       icon: 'i-lucide-check-circle',
       color: 'success',
     })
   }
   catch (e: any) {
+    if (e.metadataRefreshed) {
+      toast.add({
+        id: 'gen-error',
+        title: e.stale ? 'Using cached metadata; SDK generation failed' : 'Metadata refreshed; SDK generation failed',
+        description: e.message,
+        icon: 'i-lucide-triangle-alert',
+        color: 'warning',
+      })
+      return
+    }
     toast.add({
       id: 'gen-error',
       title: e.stale ? 'Using Cached Metadata' : 'Metadata Refresh Failed',

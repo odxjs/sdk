@@ -394,7 +394,7 @@ describe('production Explorer endpoint policy', () => {
     const server = await listenExplorerApi(config, { authenticated: true, generator })
 
     try {
-      const response: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`)
+      const response: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { method: 'POST' })
       const tempFile = join(rootDir, '.nuxt', 'odx', 'temp', 'RemoteService.edmx')
       const persistentCacheFile = join(rootDir, '.odx', 'cache', 'RemoteService.edmx')
 
@@ -438,8 +438,8 @@ describe('production Explorer endpoint policy', () => {
     try {
       const endpoint = `${server.url}/__odx__/generate?service=RemoteService`
       const [first, second] = await Promise.all([
-        ofetch<any>(endpoint),
-        ofetch<any>(endpoint),
+        ofetch<any>(endpoint, { method: 'POST' }),
+        ofetch<any>(endpoint, { method: 'POST' }),
       ])
 
       expect(backend.requests).toHaveLength(1)
@@ -451,7 +451,7 @@ describe('production Explorer endpoint policy', () => {
         source: 'remote',
       })
 
-      await ofetch(endpoint)
+      await ofetch(endpoint, { method: 'POST' })
       expect(backend.requests).toHaveLength(2)
     }
     finally {
@@ -470,14 +470,17 @@ describe('production Explorer endpoint policy', () => {
     try {
       const endpoint = `${server.url}/__odx__/generate?service=RemoteService`
       const failures = await Promise.allSettled([
-        ofetch(endpoint, { retry: 0 }),
-        ofetch(endpoint, { retry: 0 }),
+        ofetch(endpoint, { retry: 0, method: 'POST',
+        }),
+        ofetch(endpoint, { retry: 0, method: 'POST',
+        }),
       ])
 
       expect(failures.map(result => result.status)).toEqual(['rejected', 'rejected'])
       expect(backend.requests).toHaveLength(1)
 
-      await expect(ofetch(endpoint, { retry: 0 })).rejects.toMatchObject({ status: 500 })
+      await expect(ofetch(endpoint, { retry: 0, method: 'POST',
+      })).rejects.toMatchObject({ status: 500 })
       expect(backend.requests).toHaveLength(2)
     }
     finally {
@@ -508,7 +511,7 @@ describe('production Explorer endpoint policy', () => {
     const server = await listenExplorerApi(config, { authenticated: true })
 
     try {
-      const response: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`)
+      const response: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { method: 'POST' })
 
       expect(response).toMatchObject({
         success: true,
@@ -538,7 +541,8 @@ describe('production Explorer endpoint policy', () => {
     const config = createRuntimeMetadataConfig(rootDir, `${backend.url}${servicePath}`)
     const server = await listenExplorerApi(config, { authenticated: true })
     try {
-      const refresh: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { retry: 0 })
+      const refresh: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { retry: 0, method: 'POST',
+      })
       expect(refresh).toMatchObject({ success: true, source: 'remote', stale: false })
       expect(backend.requests).toHaveLength(1)
       expect(backend.requests[0]?.url).toBe(expectedPath)
@@ -572,6 +576,7 @@ describe('production Explorer endpoint policy', () => {
           'Proxy-Authorization': 'Basic incoming-proxy-secret',
           'X-Incoming-Header': 'incoming',
         },
+        method: 'POST',
       })
 
       expect(response).toMatchObject({
@@ -634,6 +639,7 @@ describe('production Explorer endpoint policy', () => {
         headers: {
           Authorization: 'Bearer stale-refresh-user-token-088',
         },
+        method: 'POST',
       })
       const tempFile = join(rootDir, '.nuxt', 'odx', 'temp', 'DestinationService088.edmx')
 
@@ -683,6 +689,7 @@ describe('production Explorer endpoint policy', () => {
         headers: {
           Authorization: 'Bearer destination-resolution-failure-token-088',
         },
+        method: 'POST',
       })
       const tempFile = join(rootDir, '.nuxt', 'odx', 'temp', 'DestinationService088.edmx')
 
@@ -724,6 +731,7 @@ describe('production Explorer endpoint policy', () => {
         headers: {
           Authorization: 'Bearer missing-bindings-user-token-088',
         },
+        method: 'POST',
       })
       const tempFile = join(rootDir, '.nuxt', 'odx', 'temp', 'DestinationService088.edmx')
 
@@ -759,7 +767,8 @@ describe('production Explorer endpoint policy', () => {
     const paths = getRuntimeMetadataCachePaths(config, 'RemoteService')
     const server = await listenExplorerApi(config, { authenticated: true })
     try {
-      const response: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { retry: 0 })
+      const response: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { retry: 0, method: 'POST',
+      })
       expect(response).toMatchObject({ success: true, operation: 'metadata-refresh', generated: false, source: 'remote', stale: false, bytes: Buffer.byteLength(xml) })
       expect(readFileSync(paths.tempFile, 'utf8')).toBe(xml)
       expect(readFileSync(paths.persistentCacheFile, 'utf8')).toBe(xml)
@@ -780,7 +789,8 @@ describe('production Explorer endpoint policy', () => {
     const paths = writeRuntimeMetadataCache(config, 'RemoteService', staleMetadataXml)
     const server = await listenExplorerApi(config, { authenticated: true })
     try {
-      const response: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { retry: 0 })
+      const response: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { retry: 0, method: 'POST',
+      })
       expect(response).toMatchObject({
         success: true,
         generated: false,
@@ -791,7 +801,8 @@ describe('production Explorer endpoint policy', () => {
       expect(readFileSync(paths.tempFile, 'utf8')).toBe(staleMetadataXml)
       expect(readFileSync(paths.persistentCacheFile, 'utf8')).toBe(staleMetadataXml)
       backendOptions.stream = undefined
-      const recovery: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { retry: 0 })
+      const recovery: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { retry: 0, method: 'POST',
+      })
       expect(recovery).toMatchObject({ success: true, source: 'remote', stale: false, staleReason: null })
       expect(readFileSync(paths.persistentCacheFile, 'utf8')).toBe(metadataXml)
       expect(backend.requests).toHaveLength(2)
@@ -813,7 +824,7 @@ describe('production Explorer endpoint policy', () => {
     const server = await listenExplorerApi(config, { authenticated: true })
 
     try {
-      const response: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`)
+      const response: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { method: 'POST' })
       const tempFile = join(rootDir, '.nuxt', 'odx', 'temp', 'RemoteService.edmx')
 
       expect(response).toMatchObject({
@@ -847,7 +858,7 @@ describe('production Explorer endpoint policy', () => {
     try {
       let error: any
       try {
-        await ofetch(`${server.url}/__odx__/generate?service=RemoteService`)
+        await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { method: 'POST' })
       }
       catch (err) {
         error = err
@@ -887,7 +898,7 @@ describe('production Explorer endpoint policy', () => {
     try {
       let error: any
       try {
-        await ofetch(`${server.url}/__odx__/generate?service=LocalService`)
+        await ofetch(`${server.url}/__odx__/generate?service=LocalService`, { method: 'POST' })
       }
       catch (err) {
         error = err
@@ -918,7 +929,7 @@ describe('production Explorer endpoint policy', () => {
     const server = await listenExplorerApi(config, { authenticated: true })
 
     try {
-      const refresh: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`)
+      const refresh: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { method: 'POST' })
       expect(refresh).toMatchObject({ stale: true, source: 'cache' })
       expect(readFileSync(persistentCacheFile, 'utf8')).toBe(staleMetadataXml)
       expect(readFileSync(getRuntimeMetadataCachePaths(config, 'RemoteService').tempFile, 'utf8')).toBe(staleMetadataXml)
@@ -976,7 +987,8 @@ describe('production Explorer endpoint policy', () => {
     const paths = getRuntimeMetadataCachePaths(config, 'RemoteService')
     const server = await listenExplorerApi(config, { authenticated: true })
     try {
-      const refresh: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { retry: 0 })
+      const refresh: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { retry: 0, method: 'POST',
+      })
       expect(refresh).toMatchObject({ success: true, source: 'remote', stale: false })
       expect(readFileSync(paths.tempFile, 'utf8')).toBe(xml)
       expect(readFileSync(paths.persistentCacheFile, 'utf8')).toBe(xml)
@@ -998,7 +1010,8 @@ describe('production Explorer endpoint policy', () => {
     writeFileSync(cachePath, '<edmx:Edmx>')
     const server = await listenExplorerApi(config, { authenticated: true })
     try {
-      await expect(ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { retry: 0 })).rejects.toMatchObject({ status: 500 })
+      await expect(ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { retry: 0, method: 'POST',
+      })).rejects.toMatchObject({ status: 500 })
       expect(readFileSync(cachePath, 'utf8')).toBe('<edmx:Edmx>')
       expect(existsSync(paths.stateFile)).toBe(false)
       if (cacheKind === 'persistent')
@@ -1020,7 +1033,8 @@ describe('production Explorer endpoint policy', () => {
     writeFileSync(paths.tempFile, '<edmx:Edmx>')
     const server = await listenExplorerApi(config, { authenticated: true })
     try {
-      const refresh: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { retry: 0 })
+      const refresh: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { retry: 0, method: 'POST',
+      })
       expect(refresh).toMatchObject({ success: true, source: 'cache', stale: true })
       expect(refresh.staleReason).toContain('Status: 503')
       expect(readFileSync(paths.tempFile, 'utf8')).toBe(staleMetadataXml)
@@ -1221,7 +1235,7 @@ describe('production Explorer endpoint policy', () => {
       const capabilities = await ofetch(`${server.url}/__odx__/config`)
       expect(capabilities.capabilities.sdkGeneration).toBe(true)
       expect(capabilities.services[0].capabilities.sdkGeneration).toBe(true)
-      const response: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`)
+      const response: any = await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { method: 'POST' })
       const tempFile = join(rootDir, '.nuxt', 'odx', 'temp', 'RemoteService.edmx')
       const outDir = join(rootDir, '.nuxt', 'odx', 'generated', 'RemoteService')
 
@@ -1241,6 +1255,50 @@ describe('production Explorer endpoint policy', () => {
     }
   })
 
+  it('rejects GET regeneration without refreshing metadata or invoking a generator', async () => {
+    process.env.NODE_ENV = 'development'
+    const rootDir = createTempRoot()
+    const backend = await listenMetadataBackend()
+    const generator = vi.fn()
+    const server = await listenExplorerApi(createRuntimeMetadataConfig(rootDir, `${backend.url}/odata`), { generator })
+    try {
+      const response = await fetch(`${server.url}/__odx__/generate?service=RemoteService`)
+      expect(response.status).toBe(405)
+      expect(response.headers.get('allow')).toBe('POST')
+      expect(generator).not.toHaveBeenCalled()
+      expect(backend.requests).toHaveLength(0)
+    }
+    finally {
+      await server.close()
+      await backend.close()
+    }
+  })
+
+  it('reports refreshed metadata even when the subsequent SDK generator fails', async () => {
+    process.env.NODE_ENV = 'development'
+    const rootDir = createTempRoot()
+    const backend = await listenMetadataBackend()
+    const config = createRuntimeMetadataConfig(rootDir, `${backend.url}/odata`)
+    const generator = vi.fn(() => {
+      throw new Error('Synthetic generator failure')
+    })
+    const server = await listenExplorerApi(config, { generator })
+    try {
+      await expect(ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { method: 'POST' })).rejects.toMatchObject({
+        status: 500,
+        data: { data: { operation: 'sdk-generation', generated: false, metadataRefreshed: true, service: 'RemoteService', error: 'Synthetic generator failure', stale: false, source: 'remote', hash: expect.any(String), bytes: expect.any(Number) } },
+      })
+      expect(generator).toHaveBeenCalledOnce()
+      const refreshed = await ofetch(`${server.url}/__odx__/config`)
+      expect(refreshed.services[0].metadata.status).toBe('available')
+      expect(refreshed.services[0].metadata.hash).toEqual(expect.any(String))
+    }
+    finally {
+      await server.close()
+      await backend.close()
+    }
+  })
+
   it('refreshes metadata without claiming SDK generation when a development host has no generator', async () => {
     process.env.NODE_ENV = 'development'
     const rootDir = createTempRoot()
@@ -1249,7 +1307,7 @@ describe('production Explorer endpoint policy', () => {
     const server = await listenExplorerApi(config)
 
     try {
-      expect(await ofetch(`${server.url}/__odx__/generate?service=RemoteService`)).toMatchObject({
+      expect(await ofetch(`${server.url}/__odx__/generate?service=RemoteService`, { method: 'POST' })).toMatchObject({
         success: true,
         generated: false,
         operation: 'metadata-refresh',

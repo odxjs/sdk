@@ -121,6 +121,29 @@ the upstream. Root and Explorer typechecks pass after rebuilding the new public
 core types. Opus's remaining generation-after-refresh partial-failure finding
 is the next bounded follow-up; it is not claimed resolved here.
 
+### D4b: partial generation failure and metadata reconciliation
+
+The generation endpoint now requires POST. GET returns 405/Allow before any
+refresh or generator invocation. A new failing test demonstrated that the old
+side-effecting GET was automatically repeated by ofetch on HTTP 500; the POST
+contract invokes the failing generator once. Production authentication still
+runs before method checks.
+
+If generation fails after metadata refresh completes, HTTP 500 retains the
+typed `ODataExplorerGenerationFailure` facts: metadataRefreshed, service,
+hash/timestamps/source/stale state and the generator diagnostic. The Explorer
+refreshes config and reports the partial outcome separately, preserving stale
+cache semantics. Successful messages also retain the original service name
+across navigation. A changed metadata hash reloads the selected entity schema
+and graph; health-only changes do not refetch or recreate the graph.
+
+Executed evidence: 120 focused API/state/graph regressions and Explorer typecheck
+pass. All 24 freshly built production Chromium journeys passed, including an
+actual refreshed XML document that adds UpdatedField followed by a throwing
+generator: the UI shows the new table column, updated graph and partial-failure
+notification. A later assertion waits for the graph's final painted opacity;
+the final UX gate will also recapture that evidence after optional graph work.
+
 ### Earlier baseline and native integration
 
 The executable baseline/controller work is implemented in local commits

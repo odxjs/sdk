@@ -5,6 +5,7 @@ import { useNuxtApp } from 'nuxt/app'
 import { onScopeDispose } from 'vue'
 import { createAppState } from '../utils/appState'
 import { createLatestRequest } from '../utils/latestRequest'
+import { ExplorerGenerationError } from '../utils/requestError'
 
 const RE_ABSOLUTE_HTTP_URL = /^https?:\/\//i
 const RE_LEADING_SLASHES = /^\/+/
@@ -31,6 +32,7 @@ export interface ODataServiceState extends Omit<ODataServiceConfig, 'route' | 's
     staleReason?: string | null
     message?: string
     refreshedAt?: string | null
+    hash?: string | null
   }
   isGenerated?: boolean
   generation?: {
@@ -602,9 +604,16 @@ function createSharedODataState(): SharedODataState {
   async function refreshServiceMetadata(name: string): Promise<any> {
     generatingStatus.value[name] = true
     try {
-      const res = await fetch(buildGenerateEndpointUrl(name))
+      const res = await fetch(buildGenerateEndpointUrl(name), { method: 'POST' })
       if (!res.ok) {
         const body = await res.json().catch(() => null)
+        const partial = body?.data
+        if (partial?.metadataRefreshed === true && partial.operation === 'sdk-generation'
+          && partial.generated === false && partial.service === name) {
+          await fetchConfig()
+          updateServiceHealth(name, partial.stale ? 'degraded' : 'online', !partial.stale)
+          throw new ExplorerGenerationError(typeof partial.error === 'string' ? partial.error : 'SDK generation failed after metadata refresh.', partial.stale === true)
+        }
         const msg = body?.message || body?.statusMessage || `Metadata refresh failed (${res.status})`
         throw new Error(msg)
       }
@@ -661,8 +670,8 @@ function createSharedODataState(): SharedODataState {
     logSearch.value = ''
   }
 
-  // Watch for selectedEntity changes to update the entitySchema and restore cached data
-  watch([() => selectedService.value?.name, selectedEntity], async ([svcName, newEntity]) => {
+  // A refreshed CSDL document can change the schema without changing selection.
+  watch([() => selectedService.value?.name, selectedEntity, () => selectedService.value?.metadata?.hash], async ([svcName, newEntity]) => {
     previewRequest.cancel()
     previewLoading.value = false
     schemaRequest.cancel()

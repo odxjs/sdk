@@ -47,7 +47,7 @@ async function stop(server: Server): Promise<void> {
 }
 
 /** Actual ODX handlers and a synthetic loopback OData service; no SAP credentials. */
-export async function createExplorerBrowserBackend(options: { version?: 'v2' | 'v4', compositeKey?: boolean, secondService?: boolean, concurrency?: boolean, expanded?: boolean, readOnly?: boolean } = {}): Promise<ExplorerBrowserBackend> {
+export async function createExplorerBrowserBackend(options: { version?: 'v2' | 'v4', compositeKey?: boolean, secondService?: boolean, concurrency?: boolean, expanded?: boolean, readOnly?: boolean, generatorFailure?: boolean } = {}): Promise<ExplorerBrowserBackend> {
   const directory = await mkdtemp(join(tmpdir(), 'odx-explorer-browser-'))
   const version = options.version ?? 'v4'
   const edmxNamespace = version === 'v2' ? 'http://schemas.microsoft.com/ado/2007/06/edmx' : 'http://docs.oasis-open.org/odata/ns/edmx'
@@ -82,7 +82,7 @@ export async function createExplorerBrowserBackend(options: { version?: 'v2' | '
     requests.push({ method: request.method, url: request.url, body: Buffer.concat(chunks).toString(), sessionHeader: request.headers['x-odx-browser-session'], ifMatch: request.headers['if-match'] })
     if (request.method === 'GET' && request.url === '/odata/$metadata') {
       response.setHeader('Content-Type', 'application/xml')
-      response.end(xml)
+      response.end(options.generatorFailure ? xml.replace('<Property Name="Name" Type="Edm.String"/>', '<Property Name="Name" Type="Edm.String"/><Property Name="UpdatedField" Type="Edm.String"/>') : xml)
       return
     }
     response.setHeader('Content-Type', 'application/json')
@@ -188,6 +188,8 @@ export async function createExplorerBrowserBackend(options: { version?: 'v2' | '
   app.use(defineEventHandler((event) => {
     gatewayRequests.push({ path: event.path, url: event.node.req.url })
     event.context.odataConfig = config
+    if (options.generatorFailure)
+      event.context.odataGenerator = () => { throw new Error('Synthetic generator failure') }
   }))
   app.use('/__odx__/config', configHandler)
   app.use('/__odx__/generate', generateHandler)

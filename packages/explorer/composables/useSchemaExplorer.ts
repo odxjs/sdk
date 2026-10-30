@@ -59,13 +59,11 @@ function createSchemaExplorer(): SchemaExplorer {
     schema: markRaw(SchemaNode),
   }
 
-  // Watch for service changes
-  watch(selectedService, (newSvc, oldSvc) => {
-    if (newSvc) {
-      // Only fetch if the actual service changed, not just its health status
-      if (newSvc.name !== oldSvc?.name) {
-        fetchSchema(newSvc.name)
-      }
+  // Metadata can change independently of selection; health updates must not
+  // recreate the graph or cause a schema/store feedback loop.
+  watch([() => selectedService.value?.name, () => selectedService.value?.metadata?.hash], ([name]) => {
+    if (name) {
+      fetchSchema(name)
     }
     else {
       schemaRequest.cancel()

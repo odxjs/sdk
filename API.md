@@ -785,7 +785,7 @@ Production exposes only these derived flags/method names, never rule contents.
 | --- | --- | --- |
 | `/__odx__/config` | Resolved service config, entities, versions, and explicit host/service capabilities for DevTools inspection. | Authenticated. Returns only top-level `basePath`, `mode`, `capabilities`, and sanitized `services` entries with entity, metadata and derived capability state. |
 | `/__odx__/logs` | Memory-backed traffic logs through `OdxLogStore` by default. `GET` supports retention-friendly filters such as `limit`, `offset`, `service`, `method`, `status`, `from`, `to`, `before`, `after`, `includePending=false`, and `order=asc\|desc`; `DELETE` clears all local logs or a bounded subset with `service`, `before`, or `to`. Logs redact secrets and bound large payloads before storage, display, export, or test use. | Authenticated. With `devtools.logStore.provider=sql`, returns and clears persisted redacted traffic logs through the `OdxLogStore` boundary. Without SQL storage, returns `[]` and rejects `DELETE`. Production payload bodies are omitted by default. |
-| `/__odx__/generate?service=<name>` | Refreshes metadata, then runs SDK generation only when the host supplies a generator. Hosts without one return a successful metadata-refresh result with `generated: false`. | Authenticated. Refreshes runtime metadata cache state only. It does not run `odata2ts` or write generated TypeScript SDK files. Responses include `operation: "metadata-refresh"`, stale state, timestamp, hash, byte count, and metadata source. |
+| `POST /__odx__/generate?service=<name>` | Refreshes metadata, then runs SDK generation only when the host supplies a generator. Hosts without one return a successful metadata-refresh result with `generated: false`. | Authenticated. Refreshes runtime metadata cache state only. It does not run `odata2ts` or write generated TypeScript SDK files. Responses include `operation: "metadata-refresh"`, stale state, timestamp, hash, byte count, and metadata source. |
 | `/__odx__/schema?service=<name>` | Parsed EDMX schema. `raw=true` can return XML locally. | Authenticated. Uses cached parsed metadata only and rejects raw XML. |
 | `/__odx__/types?service=<name>` | Local generated TypeScript model files. | Authenticated but disabled. Returns `403`. |
 | `/__odx__/me` | Current user info from SAP security context or local fallback. | Authenticated. Returns sanitized SAP user context and omits raw token data. |
@@ -800,6 +800,15 @@ only and may return `stale: true` when it had to use cached EDMX because the
 backend was unreachable. Generated SDK/type files remain development, build, or
 CI artifacts. Concurrent refreshes for the same cache are coalesced into one
 upstream request. A later explicit refresh starts a fresh request.
+
+Refresh/generation requires POST; GET returns `405` with `Allow: POST` before
+performing either operation. This avoids treating a side-effecting command as
+an automatically retryable read. If development SDK generation fails after
+refresh completes, HTTP 500 retains typed `ODataExplorerGenerationFailure`
+facts in its `data`: `metadataRefreshed: true`, `generated: false`, the original
+service, metadata hash/timestamps/source/stale state, and generator error.
+The Explorer reconciles config and schema, then reports the partial failure.
+`stale: true` still means cached metadata, not a freshly verified backend.
 
 Production traffic history is disabled unless SQL log storage is explicitly
 configured. The `OdxLogStore` boundary, memory implementation, db0-backed SQL

@@ -142,6 +142,11 @@ The Explorer uses explicit host capabilities for metadata refresh, SDK
 generation and the development types endpoint. A Node version alone does not
 imply that an SDK generator exists. A host without one still refreshes metadata
 and reports `generated: false`.
+Refresh/generation sends POST. A later SDK failure still reports the completed
+metadata refresh; the UI reconciles fields and schema and distinguishes this
+partial result from a failed refresh. A changed metadata hash reloads the
+selected entity/graph without resetting selection or refetching on health-only
+updates.
 
 Services can project `capabilities.dataMethods` from their existing static
 method rules. The toolbar omits restricted methods and disables unavailable

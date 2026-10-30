@@ -5,6 +5,36 @@ import { useSharedODataState } from '../composables/useODataState'
 import { provideSchemaExplorer, useSchemaExplorer } from '../composables/useSchemaExplorer'
 
 describe('schema component ownership', () => {
+  it('reloads a changed metadata revision without refetching on health updates', async () => {
+    const state = useSharedODataState()
+    state.selectedService.value = { name: 'Synthetic', route: 'synthetic', metadata: { hash: 'one' } } as any
+    let entity = 'Products'
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ entities: [{ name: entity, type: entity, properties: [] }] })))
+    let controller!: ReturnType<typeof provideSchemaExplorer>
+    const Owner = defineComponent({ setup() {
+      controller = provideSchemaExplorer()
+      return () => h('div')
+    } })
+    let wrapper: Awaited<ReturnType<typeof mountSuspended>> | undefined
+    try {
+      wrapper = await mountSuspended(Owner)
+      await expect.poll(() => controller.globalNodes.value.map(node => node.id)).toEqual(['Products'])
+      const initialReads = fetchMock.mock.calls.length
+      state.updateServiceHealth('Synthetic', 'online', true)
+      await Promise.resolve()
+      expect(fetchMock).toHaveBeenCalledTimes(initialReads)
+      entity = 'UpdatedProducts'
+      state.selectedService.value = { ...state.selectedService.value!, metadata: { hash: 'two' } }
+      await expect.poll(() => controller.globalNodes.value.map(node => node.id)).toEqual(['UpdatedProducts'])
+      expect(fetchMock).toHaveBeenCalledTimes(initialReads + 1)
+    }
+    finally {
+      wrapper?.unmount()
+      fetchMock.mockRestore()
+      state.selectedService.value = null
+    }
+  })
+
   it('recreates the rendered graph owner after remount and rejects the old response', async () => {
     const state = useSharedODataState()
     state.selectedService.value = { name: 'Synthetic', route: 'synthetic' } as any

@@ -1,11 +1,15 @@
-import type { ODataProxyConfig } from '@me-tools/odx-core'
-import { createError, defineEventHandler, getQuery } from 'h3'
+import type { ODataExplorerGenerationFailure, ODataProxyConfig } from '@me-tools/odx-core'
+import { createError, defineEventHandler, getQuery, setHeader } from 'h3'
 import { join } from 'pathe'
 import { enforceExplorerEndpointPolicy, isProductionExplorerRuntime } from '../utils/explorer-policy'
 import { refreshRuntimeMetadata, sanitizeMetadataFailureReason } from '../utils/metadata-refresh'
 
 export default defineEventHandler(async (event) => {
   enforceExplorerEndpointPolicy(event, 'generate')
+  if (event.method !== 'POST') {
+    setHeader(event, 'Allow', 'POST')
+    throw createError({ statusCode: 405, statusMessage: 'Metadata refresh and SDK generation require POST' })
+  }
 
   const config = event.context.odataConfig as ODataProxyConfig
   const query = getQuery(event)
@@ -49,7 +53,30 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    await generate(metadata.inputPath, outDir, matched.name)
+    try {
+      await generate(metadata.inputPath, outDir, matched.name)
+    }
+    catch (error) {
+      throw createError({
+        statusCode: 500,
+        statusMessage: 'SDK generation failed after metadata refresh',
+        data: {
+          success: false,
+          operation: 'sdk-generation',
+          generated: false,
+          metadataRefreshed: true,
+          service: matched.name,
+          error: error instanceof Error ? error.message : String(error),
+          stale: metadata.stale,
+          staleReason: metadata.staleReason,
+          timestamp: metadata.timestamp,
+          refreshedAt: metadata.refreshedAt,
+          hash: metadata.hash,
+          bytes: metadata.bytes,
+          source: metadata.source,
+        } satisfies ODataExplorerGenerationFailure,
+      })
+    }
 
     return {
       success: true,

@@ -1393,6 +1393,16 @@ export interface ODataExplorerMetadataState {
   message?: string
 }
 
+/** SDK generation failed after the metadata refresh operation completed. */
+export interface ODataExplorerGenerationFailure extends Pick<ODataExplorerMetadataState, 'source' | 'stale' | 'staleReason' | 'refreshedAt' | 'timestamp' | 'hash' | 'bytes'> {
+  success: false
+  operation: 'sdk-generation'
+  generated: false
+  metadataRefreshed: true
+  service: string
+  error: string
+}
+
 export interface ODataExplorerConfigResponse {
   basePath: string
   mode: string
