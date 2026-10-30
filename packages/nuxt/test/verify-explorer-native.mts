@@ -46,6 +46,8 @@ async function main(): Promise<void> {
   const milestones: Record<string, number> = {}
   const errors: string[] = []
   const failedResponses: { url: string, status: number }[] = []
+  const failedRequests: { url: string, instance: string | null, error: string | undefined }[] = []
+  const clientRequests = new Map<string, number>()
   const operationRequests: string[] = []
   const connectedSockets: string[] = []
   const base = '/console/_nuxt/odx-explorer/'
@@ -123,6 +125,16 @@ async function main(): Promise<void> {
     await page!.frameLocator('iframe[src*="/__nuxt_devtools__/client/"]').getByText('Star on GitHub', { exact: true }).waitFor()
     await page!.getByRole('button', { name: 'ODX', exact: true }).click()
   }
+  async function waitForClient(selector: string, instance: string): Promise<void> {
+    await poll(async () => {
+      // Devframe retains stopped frames. Their deliberate termination can abort
+      // outstanding imports while a different instance is already starting.
+      const startupFailures = failedRequests.filter(request => request.instance === instance)
+      if (errors.length || startupFailures.length)
+        throw new Error(`Explorer client startup failed: ${JSON.stringify({ errors, failedRequests: startupFailures })}`)
+      return page!.frameLocator(selector).getByRole('button', { name: 'Services', exact: true }).isVisible()
+    }, 'The native Explorer client did not become interactive.', 120_000)
+  }
 
   try {
     explorerSourceHash = await getExplorerSourceHash(join(root, 'packages/explorer'))
@@ -172,8 +184,14 @@ async function main(): Promise<void> {
       if (response.status() >= 400)
         failedResponses.push({ url: redact(response.url()), status: response.status() })
     })
+    page.on('requestfailed', (request) => {
+      const frame = request.serviceWorker() ? undefined : request.frame()
+      failedRequests.push({ url: redact(request.url()), instance: frame ? new URL(frame.url()).searchParams.get('odxInstance') : null, error: request.failure()?.errorText })
+    })
     page.on('request', (request) => {
       const url = new URL(request.url())
+      if (url.pathname.startsWith(base))
+        clientRequests.set(redact(request.url()), (clientRequests.get(redact(request.url())) || 0) + 1)
       if (url.pathname.startsWith('/console/__odx__/') || url.pathname.startsWith('/console/custom/odata/'))
         operationRequests.push(`${url.origin}${url.pathname}`)
     })
@@ -200,7 +218,7 @@ async function main(): Promise<void> {
     await page.getByRole('button', { name: RE_START }).click()
     const clientSelector = `iframe[src*="${base}?odxInstance=1"]`
     const client = page.frameLocator(clientSelector)
-    await client.getByRole('button', { name: 'Services', exact: true }).waitFor({ timeout: 120_000 })
+    await waitForClient(clientSelector, '1')
     milestone('client-ready')
     const firstClientUrl = new URL((await page.locator(clientSelector).getAttribute('src'))!, origin).href
     await client.getByRole('button', { name: 'Services', exact: true }).click()
@@ -266,7 +284,7 @@ async function main(): Promise<void> {
     await page.getByRole('button', { name: RE_START }).click()
     await restartedDocument
     const restartedSelector = `iframe[src*="${base}?odxInstance=2"]`
-    await page.frameLocator(restartedSelector).getByRole('button', { name: 'Services', exact: true }).waitFor({ timeout: 120_000 })
+    await waitForClient(restartedSelector, '2')
     assert.notEqual(new URL((await page.locator(restartedSelector).getAttribute('src'))!, origin).href, firstClientUrl)
     milestone('native-terminate-relaunch')
     assert.deepEqual(errors, [])
@@ -278,6 +296,12 @@ async function main(): Promise<void> {
     if (page) {
       await page.screenshot({ path: join(output, 'failure.png') }).catch(() => undefined)
       await writeFile(join(output, 'failure-ui.txt'), redact(await page.locator('body').ariaSnapshot().catch(() => 'Snapshot unavailable.')))
+      const terminals = page.getByRole('button', { name: 'Terminals', exact: true })
+      if (await terminals.isVisible()) {
+        await terminals.click().catch(() => undefined)
+        await page.screenshot({ path: join(output, 'failure-terminal.png') }).catch(() => undefined)
+        await writeFile(join(output, 'failure-terminal-ui.txt'), redact(await page.locator('body').ariaSnapshot().catch(() => 'Snapshot unavailable.')))
+      }
     }
   }
   finally {
@@ -307,6 +331,8 @@ async function main(): Promise<void> {
       connectedSockets,
       errors,
       failedResponses,
+      failedRequests,
+      clientRequests: Object.fromEntries(clientRequests),
       cleanup,
       retainedFramesAtStop,
       polling,
