@@ -115,6 +115,19 @@ document navigation and that the old pane no longer accepts pointer events.
 This also exposes the next embedded-UX slice: a hidden pane's document stays
 `visible`, so document visibility alone cannot pause its background polling.
 
+That bounded E1 slice is now implemented and measured with actual native pane
+switching: in matched 6.5-second hidden windows, log reads drop from 2 to 0;
+return reconciliation improves from 2,335 ms to 59 ms in these local samples.
+Both documents still report `visible`. The new controller observes only its
+same-origin frame/ancestor attributes and uses standard interaction/visibility
+state, not a Devframe opacity constant. Active resizing does not trigger extra
+reads; unmount disconnects the observer. Three focused ownership tests and the
+native data/schema/log/proxy/HMR/terminate/relaunch journey pass. The before
+receipt explicitly records measurements without asserting the new visibility
+gate; the after run asserts zero hidden reads. Receipts are
+`e1-polling-{before,after}/receipt.json`. These timings are local observations,
+not a general startup/performance promise.
+
 The next bounded change updates the primary Nuxt host to 4.6.3, Kit/Schema to
 the same version, Test Utils to 4.3.4 and Module Builder to 1.0.3. The initial
 separate Nuxt update exposed a real bootstrap failure: Nuxt UI 4.9 calls

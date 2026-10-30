@@ -71,6 +71,13 @@ listener. Configuration and traffic access failures show an explicit error and
 Retry action; denied responses clear previously displayed private state. Failed
 history deletion retains the existing history and reports the failure.
 
+In a same-origin embedded host, polling also observes the owning iframe and
+its ancestors. A retained pane with disabled pointer interaction, `inert`, or
+hidden CSS pauses reads even when its document still reports `visible`.
+Returning to the pane reconciles immediately; active size/style changes do
+not dispatch extra reads. Teardown disconnects the observer. Cross-origin
+frames retain browser isolation and only use document visibility.
+
 ## Record editing
 
 The editor's selected operation determines whether it creates or updates a

@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { stripVTControlCharacters } from 'node:util'
 import { consola } from 'consola'
 import { chromium } from 'playwright-core'
+import { getExplorerSourceHash } from '../../explorer/scripts/client-contract.mjs'
 import { createExplorerBrowserBackend } from '../../explorer/test/browser-backend'
 
 const RE_LOCAL = /Local:\s+(http:\/\/127\.0\.0\.1:\d+)/
@@ -58,7 +59,10 @@ async function main(): Promise<void> {
   const cleanup = { graceful: false, fallback: false, closed: false }
   let failure: unknown
   let origin: string | undefined
+  let explorerSourceHash: string | undefined
   let retainedFramesAtStop = 0
+  const recordPollingBaseline = process.argv.includes('--record-polling-baseline')
+  let polling: { hiddenWindowMs: number, hiddenReads: number, hiddenDocumentState: string, resumeLatencyMs: number, asserted: boolean } | undefined
   const backend = await createExplorerBrowserBackend()
   await mkdir(output, { recursive: true })
 
@@ -121,6 +125,7 @@ async function main(): Promise<void> {
   }
 
   try {
+    explorerSourceHash = await getExplorerSourceHash(join(root, 'packages/explorer'))
     const environment: Record<string, string | undefined> = { ...process.env, RAYON_NUM_THREADS: '1', NODE_ENV: 'development', NUXT_TELEMETRY_DISABLED: '1', ODX_EXPLORER_TEST_SERVICE_URL: backend.serviceUrl }
     delete environment.CI
     child = spawn(process.execPath, [join(dirname(require.resolve('nuxt/package.json')), 'bin/nuxt.mjs'), 'dev', join(root, 'packages/nuxt/test/fixtures/explorer-native'), '--host', '127.0.0.1', '--port', '0'], {
@@ -219,6 +224,26 @@ async function main(): Promise<void> {
     milestone('data-schema-logs-proxy-hmr')
     await page.screenshot({ path: join(output, 'proxy.png') })
 
+    const logReads = (): number => operationRequests.filter(url => url.endsWith('/console/__odx__/logs')).length
+    await page.getByRole('button', { name: 'Overview', exact: true }).click()
+    await poll(async () => await page!.locator(clientSelector).evaluate(element => getComputedStyle(element).pointerEvents === 'none'), 'The native group did not hide its Explorer pane.')
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())))
+    const hiddenDocumentState = await client.locator('body').evaluate(() => document.visibilityState)
+    const hiddenStart = performance.now()
+    const beforeHidden = logReads()
+    // Observe more than two real polling intervals, without mocking the clock.
+    await setTimeout(6500)
+    const hiddenReads = logReads() - beforeHidden
+    const hiddenWindowMs = Math.round(performance.now() - hiddenStart)
+    const beforeReturn = logReads()
+    const returnStart = performance.now()
+    await page.getByRole('button', { name: 'ODX', exact: true }).click()
+    await poll(() => logReads() > beforeReturn, 'Explorer did not reconcile traffic after returning.', 4500)
+    polling = { hiddenWindowMs, hiddenReads, hiddenDocumentState, resumeLatencyMs: Math.round(performance.now() - returnStart), asserted: !recordPollingBaseline }
+    if (!recordPollingBaseline)
+      assert.equal(hiddenReads, 0, 'A hidden native dock must not keep polling traffic.')
+    milestone('hidden-polling-reconciliation')
+
     await page.getByRole('button', { name: 'Terminals', exact: true }).click()
     const terminal = await terminalFrame()
     await terminal.getByTitle('Kill process', { exact: true }).click()
@@ -259,6 +284,8 @@ async function main(): Promise<void> {
     await browser?.close()
     await stopHost()
     await backend.close()
+    if (explorerSourceHash && explorerSourceHash !== await getExplorerSourceHash(join(root, 'packages/explorer')))
+      failure ||= new Error('Explorer sources changed during the native browser gate.')
     const source = createHash('sha256')
     for (const file of ['packages/nuxt/src/devtools.ts', 'packages/nuxt/src/devtools-contributor.ts', 'packages/explorer/nuxt.config.ts', 'pnpm-lock.yaml'])
       source.update(await readFile(join(root, file)))
@@ -271,6 +298,8 @@ async function main(): Promise<void> {
       revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim(),
       dirty: Boolean(execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim()),
       sourceHash: source.digest('hex'),
+      explorerSourceHash,
+      runnerHash: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).digest('hex'),
       exitCode: failure ? 1 : 0,
       milestones,
       origin,
@@ -280,6 +309,7 @@ async function main(): Promise<void> {
       failedResponses,
       cleanup,
       retainedFramesAtStop,
+      polling,
       failure: failure ? redact(String(failure)) : undefined,
     }, null, 2)}\n`)
   }
