@@ -69,7 +69,9 @@ function createEntityExplorer(): EntityExplorer {
   } = useSharedODataState()
 
   let loadingTimeout: ReturnType<typeof setTimeout> | null = null
+  let disposed = false
   onScopeDispose(() => {
+    disposed = true
     if (loadingTimeout)
       clearTimeout(loadingTimeout)
     editor.value = { show: false, mode: 'view', json: '', loading: false, error: null, original: null }
@@ -228,17 +230,21 @@ function createEntityExplorer(): EntityExplorer {
       return
     }
 
-    const request = previewRequest.begin()
     const service = selectedService.value
     const entity = selectedEntity.value
     const svcName = service.name
     const query = queryInput.value
     const method = queryMethod.value
+    // Navigation can supersede reads; aborting a dispatched write cannot undo it.
+    const request = method === 'GET' ? previewRequest.begin() : null
+    const isCurrent = (): boolean => request ? request.isCurrent() : !disposed
     const submittedQueryState = JSON.parse(JSON.stringify(queryState.value))
     const cacheKey = buildEntityPreviewCacheKey(svcName, entity)
 
-    previewLoading.value = true
-    previewError.value = null
+    if (request) {
+      previewLoading.value = true
+      previewError.value = null
+    }
     try {
       const isDirect = service.strategy === 'direct'
       let urlPath = ''
@@ -262,14 +268,14 @@ function createEntityExplorer(): EntityExplorer {
 
       const res = await fetch(urlPath, {
         method,
-        signal: request.signal,
+        ...(request ? { signal: request.signal } : {}),
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
           ...sessionHeaders.value,
         },
       })
-      if (!request.isCurrent())
+      if (!isCurrent())
         return
       if (!res.ok) {
         const errorText = await res.text().catch(() => '')
@@ -296,7 +302,7 @@ function createEntityExplorer(): EntityExplorer {
           }
         }
 
-        if (!request.isCurrent())
+        if (!isCurrent())
           return
         if (res.status >= 500 && !upstreamResponded) {
           updateServiceHealth(svcName, 'offline')
@@ -306,7 +312,7 @@ function createEntityExplorer(): EntityExplorer {
       }
 
       const responseText = await res.text()
-      if (!request.isCurrent())
+      if (!isCurrent())
         return
       updateServiceHealth(svcName, 'online')
       let data: any
@@ -326,8 +332,8 @@ function createEntityExplorer(): EntityExplorer {
           loading: false,
           error: null,
           original: null,
+          context: `${method} ${svcName}/${entity}`,
         }
-        previewLoading.value = false
         return
       }
 
@@ -345,9 +351,21 @@ function createEntityExplorer(): EntityExplorer {
       }
     }
     catch (e: unknown) {
-      if (!request.isCurrent())
+      if (!isCurrent())
         return
       const msg = (e as Error).message
+      if (!request) {
+        editor.value = {
+          show: true,
+          mode: 'response',
+          json: '{}',
+          loading: false,
+          error: msg,
+          original: null,
+          context: `${method} ${svcName}/${entity}`,
+        }
+        return
+      }
       previewError.value = msg
       previewData.value = []
 
@@ -361,7 +379,7 @@ function createEntityExplorer(): EntityExplorer {
       }
     }
     finally {
-      if (request.isCurrent())
+      if (request?.isCurrent())
         previewLoading.value = false
     }
   }

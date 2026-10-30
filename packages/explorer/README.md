@@ -48,6 +48,16 @@ share one controller; separate applications do not share session headers,
 selection or data caches. Entity/service changes abort obsolete reads, and late
 responses cannot overwrite the current preview or schema. App teardown stops
 the owned effects and pending reads.
+The graph controller follows its rendered component's lifetime so remounts
+rebind Vue Flow instead of retaining a detached store. Dispatched non-GET
+requests retain their response and original request context after navigation;
+aborting a browser fetch would not undo an upstream write.
+
+Traffic polling coalesces slow reads, pauses while the document is hidden and
+reconciles when it becomes visible. Unmount removes the timer and visibility
+listener. Configuration and traffic access failures show an explicit error and
+Retry action; denied responses clear previously displayed private state. Failed
+history deletion retains the existing history and reports the failure.
 
 ## Record editing
 

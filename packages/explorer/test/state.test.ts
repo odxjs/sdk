@@ -18,6 +18,8 @@ describe('explorer State Composable', () => {
     vi.mocked(globalThis.fetch).mockImplementation(async () => new Response(JSON.stringify({ entities: [] })))
     globalThis.localStorage?.clear()
     const {
+      configError,
+      logsError,
       activeTab,
       config,
       filteredLogs,
@@ -43,6 +45,8 @@ describe('explorer State Composable', () => {
       entitySchemaLoading,
       updateServiceHealth,
     } = useSharedODataState()
+    configError.value = null
+    logsError.value = null
     vi.stubGlobal('useSharedODataState', useSharedODataState)
     vi.stubGlobal('useToast', () => ({ add: vi.fn() }))
     ;['Northwind', 'SAP'].forEach(name => updateServiceHealth(name, 'checking', true))
@@ -92,7 +96,7 @@ describe('explorer State Composable', () => {
     const { fetchConfig, config } = useSharedODataState()
     await fetchConfig()
 
-    expect(globalThis.fetch).toHaveBeenCalledWith('/__odx__/config')
+    expect(globalThis.fetch).toHaveBeenCalledWith('/__odx__/config', { signal: expect.any(AbortSignal) })
     expect(config.value.basePath).toBe('/api')
   })
 
@@ -158,9 +162,77 @@ describe('explorer State Composable', () => {
     const { refreshLogs, logs } = useSharedODataState()
     await refreshLogs()
 
-    expect(globalThis.fetch).toHaveBeenCalledWith('/__odx__/logs')
+    expect(globalThis.fetch).toHaveBeenCalledWith('/__odx__/logs', { signal: expect.any(AbortSignal) })
     expect(logs.value).toHaveLength(1)
     expect(logs.value[0]!.id).toBe('1')
+  })
+
+  it('coalesces slow log polls and prevents an old poll restoring cleared history', async () => {
+    const state = useSharedODataState()
+    let resolveRead!: (response: Response) => void
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => resolveRead = resolve))
+    const oldRead = state.refreshLogs()
+    const sameRead = state.refreshLogs()
+    expect(sameRead).toBe(oldRead)
+    expect(fetch).toHaveBeenCalledTimes(1)
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('', { status: 200 }))
+    await state.clearLogs()
+    resolveRead(new Response(JSON.stringify([{ id: 'old-traffic' }])))
+    await oldRead
+    expect(state.logs.value).toEqual([])
+    expect(state.logsError.value).toBeNull()
+  })
+
+  it.each([401, 403])('reports HTTP %i as a denied state and clears previously visible private data', async (status) => {
+    const state = useSharedODataState()
+    state.config.value = { basePath: '/api/odx', services: [{ name: 'Northwind' }] }
+    state.selectedService.value = { name: 'Northwind', route: 'northwind' } as any
+    state.sessionHeaders.value = { Authorization: 'synthetic-session' }
+    state.logs.value = [{ id: 'private-old-traffic' }] as any
+    vi.mocked(fetch).mockResolvedValue(new Response('', { status }))
+    await state.fetchConfig()
+    await state.refreshLogs()
+    await nextTick()
+    expect(state.configError.value).toContain(`HTTP ${status}`)
+    expect(state.logsError.value).toContain(`HTTP ${status}`)
+    expect(state.selectedService.value).toBeNull()
+    expect(state.sessionHeaders.value).toEqual({})
+    expect(state.logs.value).toEqual([])
+    vi.mocked(fetch).mockResolvedValue(new Response('[]'))
+    await state.refreshLogs()
+    expect(state.logsError.value).toBeNull()
+  })
+
+  it('reports failed log deletion and retains the existing history', async () => {
+    const state = useSharedODataState()
+    state.logs.value = [{ id: 'retained-traffic' }] as any
+    vi.mocked(fetch).mockResolvedValue(new Response('', { status: 403 }))
+    await expect(state.clearLogs()).rejects.toThrow('HTTP 403')
+    expect(state.logs.value).toEqual([{ id: 'retained-traffic' }])
+    expect(state.logsError.value).toContain('HTTP 403')
+  })
+
+  it('retains the outcome of a dispatched non-GET Execute after navigation', async () => {
+    const state = useSharedODataState()
+    state.selectedService.value = { name: 'Northwind', route: 'northwind', strategy: 'proxied' } as any
+    state.selectedEntity.value = 'Products'
+    await nextTick()
+    const explorer = createEntityExplorer()
+    let resolveWrite!: (response: Response) => void
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => resolveWrite = resolve))
+    state.queryMethod.value = 'DELETE'
+    const write = explorer.refreshEntityData()
+    expect(vi.mocked(fetch).mock.calls.at(-1)![1]?.signal).toBeUndefined()
+    state.selectedEntity.value = 'Suppliers'
+    resolveWrite(new Response(JSON.stringify({ result: 'accepted' })))
+    await write
+    expect(explorer.editor.value).toMatchObject({
+      show: true,
+      mode: 'response',
+      context: 'DELETE Northwind/Products',
+      json: JSON.stringify({ result: 'accepted' }, null, 2),
+    })
+    expect(state.entityDataCache.value[buildEntityPreviewCacheKey('Northwind', 'Suppliers')]).toBeUndefined()
   })
 
   it('clears server and local traffic logs', async () => {
@@ -171,7 +243,7 @@ describe('explorer State Composable', () => {
 
     await clearLogs()
 
-    expect(globalThis.fetch).toHaveBeenCalledWith('/__odx__/logs', { method: 'DELETE' })
+    expect(globalThis.fetch).toHaveBeenCalledWith('/__odx__/logs', { method: 'DELETE', signal: expect.any(AbortSignal) })
     expect(logs.value).toEqual([])
   })
 
@@ -185,7 +257,7 @@ describe('explorer State Composable', () => {
     await fetchConfig()
     await nextTick()
 
-    expect(globalThis.fetch).toHaveBeenCalledWith('/__odx__/schema?service=R%26D%20%231%3F')
+    expect(globalThis.fetch).toHaveBeenCalledWith('/__odx__/schema?service=R%26D%20%231%3F', { signal: expect.any(AbortSignal) })
 
     ;(globalThis.fetch as any).mockResolvedValue({
       ok: true,
@@ -745,7 +817,7 @@ describe('explorer State Composable', () => {
     await nextTick()
     await new Promise(resolve => setTimeout(resolve, 0))
 
-    expect(globalThis.fetch).toHaveBeenCalledWith('/__odx__/schema?service=RemoteService')
+    expect(globalThis.fetch).toHaveBeenCalledWith('/__odx__/schema?service=RemoteService', { signal: expect.any(AbortSignal) })
     expect(services.value[0]?.health).toBe('degraded')
   })
 

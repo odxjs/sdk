@@ -157,13 +157,18 @@ const columns = [
 async function runClear() {
   // eslint-disable-next-line no-alert
   if (confirm('Are you sure you want to clear all traffic logs?')) {
-    await clearLogs()
-    toast.add({
-      id: 'purge-history-success',
-      title: 'Traffic history purged',
-      icon: 'i-lucide-trash-2',
-      color: 'success',
-    })
+    try {
+      await clearLogs()
+      toast.add({
+        id: 'purge-history-success',
+        title: 'Traffic history purged',
+        icon: 'i-lucide-trash-2',
+        color: 'success',
+      })
+    }
+    catch {
+      // The shared error banner retains the failure and provides a retry.
+    }
   }
 }
 </script>

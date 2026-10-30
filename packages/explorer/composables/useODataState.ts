@@ -94,6 +94,7 @@ export interface EditorState {
   loading: boolean
   error: string | null
   original: any
+  context?: string
 }
 
 function getDefaultQueryState(): VisualQueryState {
@@ -234,6 +235,8 @@ function saveDegradedServices(overrides: Record<string, string>): void {
 
 export interface SharedODataState {
   previewRequest: ReturnType<typeof createLatestRequest>
+  configError: Ref<string | null>
+  logsError: Ref<string | null>
   activeTab: Ref<string>
   logs: Ref<ODataLog[]>
   config: Ref<ODataConfig>
@@ -280,6 +283,13 @@ export interface SharedODataState {
 function createSharedODataState(): SharedODataState {
   const previewRequest = createLatestRequest()
   const schemaRequest = createLatestRequest()
+  const configRequest = createLatestRequest()
+  const logsRequest = createLatestRequest()
+  const clearLogsRequest = createLatestRequest()
+  const configError = ref<string | null>(null)
+  const logsError = ref<string | null>(null)
+  let pendingLogs: Promise<void> | undefined
+  let clearingLogs = false
   const activeTab = ref('overview')
   const logs = ref<ODataLog[]>([])
   const config = ref<ODataConfig>({ basePath: '/__odx__', mode: 'sdk', services: [] })
@@ -340,50 +350,91 @@ function createSharedODataState(): SharedODataState {
     }
   }
 
-  async function checkServiceHealth(name: string): Promise<void> {
+  async function checkServiceHealth(name: string, request: ReturnType<typeof configRequest.begin>): Promise<void> {
     try {
-      const res = await fetch(buildSchemaEndpointUrl(name))
+      const res = await fetch(buildSchemaEndpointUrl(name), { signal: request.signal })
+      if (!request.isCurrent())
+        return
       if (!res.ok) {
         updateServiceHealth(name, 'offline')
         return
       }
       const body = await res.json().catch(() => null)
+      if (!request.isCurrent())
+        return
       updateServiceHealth(name, body?.metadata?.stale ? 'degraded' : 'online')
     }
     catch {
-      updateServiceHealth(name, 'offline')
+      if (request.isCurrent())
+        updateServiceHealth(name, 'offline')
     }
   }
 
   async function fetchConfig(): Promise<void> {
+    const request = configRequest.begin()
     try {
-      const res = await fetch(buildOdxApiEndpoint('/__odx__/config'))
-      if (res.ok) {
-        config.value = {
-          ...await res.json(),
-          apiBase: getConfiguredOdxApiBase() || 'same-origin',
+      const res = await fetch(buildOdxApiEndpoint('/__odx__/config'), { signal: request.signal })
+      if (!request.isCurrent())
+        return
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          config.value = { basePath: config.value.basePath, services: [] }
+          sessionHeaders.value = {}
+          entityDataCache.value = {}
         }
-        // Trigger background health checks for all services
-        config.value.services?.forEach((s: any) => {
-          checkServiceHealth(s.name)
-        })
+        throw new Error(`Explorer configuration unavailable (HTTP ${res.status}).`)
       }
+      const body = await res.json()
+      if (!request.isCurrent())
+        return
+      config.value = { ...body, apiBase: getConfiguredOdxApiBase() || 'same-origin' }
+      configError.value = null
+      config.value.services?.forEach((s: any) => {
+        checkServiceHealth(s.name, request)
+      })
     }
     catch (e) {
-      console.error('[ODataState] Failed to fetch config', e)
+      if (request.isCurrent())
+        configError.value = e instanceof Error ? e.message : 'Explorer configuration unavailable.'
     }
   }
 
-  async function refreshLogs(): Promise<void> {
+  function refreshLogs(): Promise<void> {
+    if (clearingLogs)
+      return Promise.resolve()
+    if (pendingLogs)
+      return pendingLogs
+    const pending = readLogs().finally(() => {
+      if (pendingLogs === pending)
+        pendingLogs = undefined
+    })
+    pendingLogs = pending
+    return pending
+  }
+
+  async function readLogs(): Promise<void> {
+    const request = logsRequest.begin()
     try {
-      const res = await fetch(buildOdxApiEndpoint('/__odx__/logs'))
-      if (res.ok) {
-        logs.value = await res.json()
-        reconcileSelectedTraceLog()
+      const res = await fetch(buildOdxApiEndpoint('/__odx__/logs'), { signal: request.signal })
+      if (!request.isCurrent())
+        return
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          logs.value = []
+          selectedTraceLogId.value = null
+        }
+        throw new Error(`Traffic logs unavailable (HTTP ${res.status}).`)
       }
+      const body = await res.json()
+      if (!request.isCurrent())
+        return
+      logs.value = body
+      logsError.value = null
+      reconcileSelectedTraceLog()
     }
     catch (e) {
-      console.error('[ODataState] Failed to refresh logs', e)
+      if (request.isCurrent())
+        logsError.value = e instanceof Error ? e.message : 'Traffic logs unavailable.'
     }
   }
 
@@ -541,13 +592,30 @@ function createSharedODataState(): SharedODataState {
   }
 
   async function clearLogs(): Promise<void> {
+    if (clearingLogs)
+      return
+    const request = clearLogsRequest.begin()
+    clearingLogs = true
+    logsRequest.cancel()
+    pendingLogs = undefined
     try {
-      await fetch(buildOdxApiEndpoint('/__odx__/logs'), { method: 'DELETE' })
+      const response = await fetch(buildOdxApiEndpoint('/__odx__/logs'), { method: 'DELETE', signal: request.signal })
+      if (!request.isCurrent())
+        return
+      if (!response.ok)
+        throw new Error(`Traffic logs could not be cleared (HTTP ${response.status}).`)
       logs.value = []
+      logsError.value = null
       selectedTraceLogId.value = null
     }
     catch (e) {
-      console.error('[ODataState] Failed to clear logs', e)
+      if (!request.isCurrent())
+        return
+      logsError.value = e instanceof Error ? e.message : 'Traffic logs could not be cleared.'
+      throw e
+    }
+    finally {
+      clearingLogs = false
     }
   }
 
@@ -620,6 +688,8 @@ function createSharedODataState(): SharedODataState {
 
   return {
     previewRequest,
+    configError,
+    logsError,
     activeTab,
     logs,
     config,

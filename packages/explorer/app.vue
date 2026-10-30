@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
+import { useExplorerPolling } from './composables/useExplorerPolling'
 import { useSharedODataState } from './composables/useODataState'
 
-const { activeTab, fetchConfig, refreshLogs, logs } = useSharedODataState()
+const { activeTab, fetchConfig, refreshLogs, logs, configError, logsError } = useSharedODataState()
+useExplorerPolling(refreshLogs)
 
 const items = computed(() => [
   { label: 'Overview', icon: 'i-lucide-house', id: 'overview' },
@@ -13,10 +15,6 @@ const items = computed(() => [
 
 onMounted(() => {
   fetchConfig()
-  refreshLogs()
-
-  const interval = setInterval(refreshLogs, 3000)
-  return () => clearInterval(interval)
 })
 </script>
 
@@ -67,8 +65,10 @@ onMounted(() => {
           </div>
         </header>
 
-        <main class="flex-1 overflow-hidden relative">
-          <div class="h-full flex flex-col overflow-hidden">
+        <main class="flex-1 min-h-0 flex flex-col overflow-hidden relative">
+          <UAlert v-if="configError" color="error" title="Configuration unavailable" :description="configError" :actions="[{ label: 'Retry', onClick: fetchConfig }]" />
+          <UAlert v-if="logsError && (activeTab === 'logs' || activeTab === 'proxy')" color="error" title="Traffic logs unavailable" :description="logsError" :actions="[{ label: 'Retry', onClick: refreshLogs }]" />
+          <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
             <TabsTabOverview v-show="activeTab === 'overview'" />
             <TabsTabServices v-show="activeTab === 'services'" />
             <TabsTabLogs v-show="activeTab === 'logs'" />

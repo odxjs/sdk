@@ -46,6 +46,8 @@ function formatJsonError(err: Error): string {
 watch(
   () => editor.value.json,
   (newVal) => {
+    if (editor.value.mode === 'response')
+      return
     if (editor.value.mode === 'view') {
       editor.value.error = null
       return
@@ -163,7 +165,7 @@ function close() {
 <template>
   <USlideover
     v-model:open="editor.show"
-    :description="(editor.mode === 'headers' ? 'Session Configuration' : selectedEntity) ?? undefined"
+    :description="(editor.mode === 'headers' ? 'Session Configuration' : editor.context ?? selectedEntity) ?? undefined"
     :ui="{ body: 'bg-neutral-50 dark:bg-neutral-950' }"
   >
     <template #title>

@@ -4,13 +4,13 @@ import { effectScope } from 'vue'
 /** Share effects within one Explorer app, with the same lifetime as that app. */
 export function createAppState<T>(create: () => T): (app: App) => T {
   const states = new WeakMap<App, T>()
-  const scopes = new Set<EffectScope>()
+  const scopes = import.meta.hot ? new Set<EffectScope>() : undefined
 
   if (import.meta.hot) {
     import.meta.hot.dispose(() => {
-      for (const scope of scopes)
+      for (const scope of scopes!)
         scope.stop()
-      scopes.clear()
+      scopes!.clear()
     })
   }
 
@@ -28,10 +28,10 @@ export function createAppState<T>(create: () => T): (app: App) => T {
       throw error
     }
     states.set(app, state)
-    scopes.add(scope)
+    scopes?.add(scope)
     app.onUnmount(() => {
       scope.stop()
-      scopes.delete(scope)
+      scopes?.delete(scope)
       states.delete(app)
     })
     return state

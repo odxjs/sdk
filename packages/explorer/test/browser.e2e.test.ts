@@ -27,7 +27,7 @@ describe('explorer real browser usage', async () => {
     await backend?.close()
   })
 
-  async function openExplorer(activation: 'pointer' | 'keyboard') {
+  async function openExplorer(activation: 'pointer' | 'keyboard' | null, configStatus?: number) {
     const context = await (await getBrowser()).newContext({ viewport: { width: 1440, height: 950 }, locale: 'en-US' })
     const page = await context.newPage()
     const errors: string[] = []
@@ -38,6 +38,10 @@ describe('explorer real browser usage', async () => {
     })
     await page.route('**/*', async (route) => {
       const target = new URL(route.request().url())
+      if (target.pathname === '/__odx__/config' && configStatus) {
+        await route.fulfill({ status: configStatus, json: { message: 'Synthetic access denied' } })
+        return
+      }
       if ((target.pathname.startsWith('/__odx__/') && !target.pathname.startsWith('/__odx__/client/')) || target.pathname.startsWith('/api/odx/')) {
         const response = await route.fetch({ url: `${backend.origin}${target.pathname}${target.search}` })
         await route.fulfill({ response })
@@ -47,6 +51,8 @@ describe('explorer real browser usage', async () => {
       }
     })
     await page.goto(url('/__odx__/client/'), { waitUntil: 'networkidle' })
+    if (!activation)
+      return { context, page, errors }
     await page.getByRole('button', { name: 'Services', exact: true }).click()
     const card = page.getByRole('link', { name: 'LocalCatalog', exact: true })
     if (activation === 'keyboard')
@@ -88,6 +94,7 @@ describe('explorer real browser usage', async () => {
       }
     }
     finally {
+      await page.unrouteAll({ behavior: 'wait' })
       await context.close()
     }
   })
@@ -116,6 +123,7 @@ describe('explorer real browser usage', async () => {
       expect(errors).toEqual([])
     }
     finally {
+      await page.unrouteAll({ behavior: 'wait' })
       await context.close()
     }
   })
@@ -133,6 +141,7 @@ describe('explorer real browser usage', async () => {
       expect(errors).toEqual([])
     }
     finally {
+      await page.unrouteAll({ behavior: 'wait' })
       await context.close()
     }
   })
@@ -172,6 +181,55 @@ describe('explorer real browser usage', async () => {
     }
     finally {
       release()
+      await page.unrouteAll({ behavior: 'wait' })
+      await context.close()
+    }
+  })
+
+  it.each([401, 403])('shows configuration HTTP %i as unavailable and recovers through Retry', async (status) => {
+    const { context, page, errors } = await openExplorer(null, status)
+    try {
+      await expect.poll(() => page.getByText('Configuration unavailable', { exact: true }).isVisible()).toBe(true)
+      expect(await page.getByText(`Explorer configuration unavailable (HTTP ${status}).`, { exact: true }).isVisible()).toBe(true)
+      await page.route('**/__odx__/config', async (route) => {
+        const response = await route.fetch({ url: `${backend.origin}/__odx__/config` })
+        await route.fulfill({ response })
+      })
+      await page.getByRole('button', { name: 'Retry', exact: true }).click()
+      await expect.poll(() => page.getByText('Configuration unavailable', { exact: true }).count()).toBe(0)
+      await page.getByRole('button', { name: 'Services', exact: true }).click()
+      await expect.poll(() => page.getByRole('link', { name: 'LocalCatalog', exact: true }).count()).toBe(1)
+      // Chromium reports failed HTTP resources to its console; the UI handles them.
+      expect(errors.filter(error => !error.includes(`status of ${status}`))).toEqual([])
+    }
+    finally {
+      await page.unrouteAll({ behavior: 'wait' })
+      await context.close()
+    }
+  })
+
+  it('shows denied traffic as an error, then restores actual logs through Retry', async () => {
+    const { context, page, errors } = await openExplorer('pointer')
+    let denied = true
+    try {
+      await page.route('**/__odx__/logs', async (route) => {
+        if (denied) {
+          await route.fulfill({ status: 403, json: { message: 'Synthetic access denied' } })
+          return
+        }
+        const response = await route.fetch({ url: `${backend.origin}/__odx__/logs` })
+        await route.fulfill({ response })
+      })
+      await page.getByRole('button', { name: 'Logs', exact: true }).first().click()
+      await expect.poll(() => page.getByText('Traffic logs unavailable (HTTP 403).', { exact: true }).isVisible(), { timeout: 10_000 }).toBe(true)
+      denied = false
+      await page.getByRole('button', { name: 'Retry', exact: true }).click()
+      await expect.poll(() => page.getByText('Traffic logs unavailable', { exact: true }).count()).toBe(0)
+      await expect.poll(() => page.getByRole('row').filter({ hasText: 'Products', visible: true }).count()).toBeGreaterThan(0)
+      expect(errors.filter(error => !error.includes('status of 403'))).toEqual([])
+    }
+    finally {
+      await page.unrouteAll({ behavior: 'wait' })
       await context.close()
     }
   })

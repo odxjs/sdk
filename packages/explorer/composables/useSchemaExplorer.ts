@@ -1,15 +1,12 @@
 import type { Association, AssociationEnd, EntityMapping, NavigationProperty } from '@me-tools/odx-core'
 import type { NodeTypesObject } from '@vue-flow/core'
+import type { InjectionKey } from 'vue'
 import { useVueFlow } from '@vue-flow/core'
 import ELK from 'elkjs/lib/elk.bundled.js'
-import { useNuxtApp } from 'nuxt/app'
-import { onScopeDispose } from 'vue'
+import { inject, onScopeDispose, provide } from 'vue'
 import SchemaNode from '../components/SchemaNode.vue'
-import { createAppState } from '../utils/appState'
 import { createLatestRequest } from '../utils/latestRequest'
 import { buildSchemaEndpointUrl } from './useODataState'
-
-const elk = new ELK()
 
 export interface SchemaExplorer {
   selectedService: Ref<any>
@@ -29,6 +26,7 @@ export interface SchemaExplorer {
 }
 
 function createSchemaExplorer(): SchemaExplorer {
+  const elk = new ELK()
   const schemaData = ref<any>(null)
   const loading = ref(false)
   const isReady = ref(false)
@@ -47,6 +45,7 @@ function createSchemaExplorer(): SchemaExplorer {
   onScopeDispose(() => {
     disposed = true
     layoutVersion++
+    elk.terminateWorker()
     if (typeof document !== 'undefined')
       document.removeEventListener('fullscreenchange', syncFullscreen)
     schemaData.value = null
@@ -416,8 +415,18 @@ function createSchemaExplorer(): SchemaExplorer {
   }
 }
 
-const getAppSchemaExplorer = createAppState(createSchemaExplorer)
+const schemaExplorerKey: InjectionKey<SchemaExplorer> = Symbol('odx-schema-explorer')
+
+/** Bind graph effects and Vue Flow to the component that owns its rendered pane. */
+export function provideSchemaExplorer(): SchemaExplorer {
+  const explorer = createSchemaExplorer()
+  provide(schemaExplorerKey, explorer)
+  return explorer
+}
 
 export function useSchemaExplorer(): SchemaExplorer {
-  return getAppSchemaExplorer(useNuxtApp().vueApp)
+  const explorer = inject(schemaExplorerKey)
+  if (!explorer)
+    throw new Error('Schema controls require an owning SchemaExplorer component.')
+  return explorer
 }

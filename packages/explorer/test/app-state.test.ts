@@ -1,9 +1,44 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createApp, h, onScopeDispose, ref, watch } from 'vue'
+import { useExplorerPolling } from '../composables/useExplorerPolling'
 import { createAppState } from '../utils/appState'
 import { createLatestRequest } from '../utils/latestRequest'
 
 describe('explorer app ownership', () => {
+  it('pauses polling while hidden, reconciles on return and stops on unmount', () => {
+    vi.useFakeTimers()
+    const visibility = vi.spyOn(document, 'visibilityState', 'get')
+    visibility.mockReturnValue('visible')
+    const refresh = vi.fn(async () => {})
+    const app = createApp({
+      setup() {
+        useExplorerPolling(refresh)
+        return () => h('div')
+      },
+    })
+    try {
+      app.mount(document.createElement('div'))
+      expect(refresh).toHaveBeenCalledTimes(1)
+      visibility.mockReturnValue('hidden')
+      document.dispatchEvent(new Event('visibilitychange'))
+      vi.advanceTimersByTime(9000)
+      expect(refresh).toHaveBeenCalledTimes(1)
+      visibility.mockReturnValue('visible')
+      document.dispatchEvent(new Event('visibilitychange'))
+      expect(refresh).toHaveBeenCalledTimes(2)
+      vi.advanceTimersByTime(3000)
+      expect(refresh).toHaveBeenCalledTimes(3)
+      app.unmount()
+      document.dispatchEvent(new Event('visibilitychange'))
+      vi.advanceTimersByTime(9000)
+      expect(refresh).toHaveBeenCalledTimes(3)
+    }
+    finally {
+      visibility.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
   it('shares one controller per app, isolates apps and disposes their effects and requests', () => {
     const changed = vi.fn()
     const disposed = vi.fn()

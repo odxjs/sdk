@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { useSchemaExplorer } from '../composables/useSchemaExplorer'
+import { provideSchemaExplorer } from '../composables/useSchemaExplorer'
 
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 
-useSchemaExplorer()
+provideSchemaExplorer()
 </script>
 
 <template>
