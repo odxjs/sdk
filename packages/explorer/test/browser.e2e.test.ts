@@ -136,4 +136,43 @@ describe('explorer real browser usage', async () => {
       await context.close()
     }
   })
+
+  it('keeps the chosen entity after a previous Execute response arrives late', async () => {
+    const { context, page, errors } = await openExplorer('pointer')
+    let release!: () => void
+    const released = new Promise<void>(resolve => release = resolve)
+    let captured!: () => void
+    const requestCaptured = new Promise<void>(resolve => captured = resolve)
+    let finished!: () => void
+    const requestFinished = new Promise<void>(resolve => finished = resolve)
+    try {
+      await page.route('**/api/odx/catalog/Products*', async (route) => {
+        try {
+          const response = await route.fetch({ url: `${backend.origin}/api/odx/catalog/Products` })
+          captured()
+          await released
+          // The original browser fetch is expected to be aborted on selection change.
+          await route.fulfill({ response }).catch(() => {})
+        }
+        finally {
+          finished()
+        }
+      })
+      await page.getByRole('button', { name: 'Execute', exact: true }).click()
+      await requestCaptured
+      await page.getByText('Suppliers', { exact: true }).filter({ visible: true }).first().click()
+      await page.getByRole('button', { name: 'Execute', exact: true }).click()
+      const supplier = page.getByRole('row').filter({ hasText: 'Browser supplier' })
+      await expect.poll(() => supplier.isVisible()).toBe(true)
+      release()
+      await requestFinished
+      await expect.poll(() => supplier.isVisible()).toBe(true)
+      expect(await page.getByRole('row').filter({ hasText: 'Zero desk' }).count()).toBe(0)
+      expect(errors).toEqual([])
+    }
+    finally {
+      release()
+      await context.close()
+    }
+  })
 })

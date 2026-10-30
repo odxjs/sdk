@@ -43,6 +43,12 @@ SAP credentials. `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` can select an existing
 compatible Chromium installation; otherwise Playwright uses its installed
 default. Set `ODX_EXPLORER_BROWSER_EVIDENCE=1` to keep local journey screenshots.
 
+Explorer state and its effects belong to one Nuxt application. Multiple views
+share one controller; separate applications do not share session headers,
+selection or data caches. Entity/service changes abort obsolete reads, and late
+responses cannot overwrite the current preview or schema. App teardown stops
+the owned effects and pending reads.
+
 ## Record editing
 
 The editor's selected operation determines whether it creates or updates a

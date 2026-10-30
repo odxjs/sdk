@@ -24,6 +24,7 @@
     "app.vue",
     "components",
     "composables",
+    "utils",
     "nuxt.config.ts"
   ],
   "publishConfig": {

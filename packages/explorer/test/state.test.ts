@@ -96,6 +96,58 @@ describe('explorer State Composable', () => {
     expect(config.value.basePath).toBe('/api')
   })
 
+  it('shares the entity controller and ignores an older Execute response, including its cache and loading state', async () => {
+    const state = useSharedODataState()
+    state.selectedService.value = { name: 'Northwind', route: 'northwind', strategy: 'proxied' } as any
+    state.selectedEntity.value = 'Products'
+    await nextTick()
+    const explorer = createEntityExplorer()
+    expect(createEntityExplorer()).toBe(explorer)
+    let resolveOld!: (response: Response) => void
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => resolveOld = resolve))
+    state.queryInput.value = '?$top=1'
+    const oldRead = explorer.refreshEntityData()
+    const oldSignal = vi.mocked(fetch).mock.calls.at(-1)![1]!.signal!
+    let resolveNew!: (response: Response) => void
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => resolveNew = resolve))
+    state.queryInput.value = '?$top=2'
+    const newRead = createEntityExplorer().refreshEntityData()
+    expect(oldSignal.aborted).toBe(true)
+    resolveOld(new Response(JSON.stringify({ value: [{ ID: 'obsolete' }] })))
+    await oldRead
+    expect(state.previewLoading.value).toBe(true)
+    expect(state.previewData.value).toBeNull()
+    resolveNew(new Response(JSON.stringify({ value: [{ ID: 'latest' }] })))
+    await newRead
+    expect(state.previewData.value).toEqual([{ ID: 'latest' }])
+    expect(state.entityDataCache.value[buildEntityPreviewCacheKey('Northwind', 'Products')])
+      .toMatchObject({ data: [{ ID: 'latest' }], query: '?$top=2' })
+    expect(state.previewLoading.value).toBe(false)
+  })
+
+  it('rejects late data and schema when switching services with the same entity name', async () => {
+    const state = useSharedODataState()
+    let resolveSchema!: (response: Response) => void
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => resolveSchema = resolve))
+    state.selectedService.value = { name: 'Northwind', route: 'northwind', strategy: 'proxied' } as any
+    state.selectedEntity.value = 'Products'
+    let resolveData!: (response: Response) => void
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => resolveData = resolve))
+    const oldRead = createEntityExplorer().refreshEntityData()
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ entities: [{ name: 'SAP product' }] })))
+    state.selectedService.value = { name: 'SAP', route: 'sap', strategy: 'proxied' } as any
+    await nextTick()
+    await nextTick()
+    resolveSchema(new Response(JSON.stringify({ entities: [{ name: 'Wrong product' }] })))
+    resolveData(new Response(JSON.stringify({ value: [{ ID: 'wrong-service' }] })))
+    await oldRead
+    await nextTick()
+    expect(state.entitySchema.value).toEqual({ entities: [{ name: 'SAP product' }] })
+    expect(state.previewData.value).toBeNull()
+    expect(state.entityDataCache.value[buildEntityPreviewCacheKey('SAP', 'Products')]).toBeUndefined()
+    expect(state.entitySchemaLoading.value).toBe(false)
+  })
+
   it('refreshes logs correctly', async () => {
     const mockLogs = [{ id: '1', method: 'GET', url: '/t', service: 'S' }]
     ;(globalThis.fetch as any).mockResolvedValue({
@@ -1053,6 +1105,7 @@ describe('explorer State Composable', () => {
 
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/odx/northwind/Products?$select=ID&$top=1', {
       method: 'GET',
+      signal: expect.any(AbortSignal),
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
@@ -1131,6 +1184,7 @@ describe('explorer State Composable', () => {
     })]))
     expect(globalThis.fetch).toHaveBeenNthCalledWith(2, '/api/odx/northwind-api/Products', {
       method: 'GET',
+      signal: expect.any(AbortSignal),
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
@@ -1194,7 +1248,7 @@ describe('explorer State Composable', () => {
     expect(queryInput.value).toBe('?$select=ID')
     expect(queryMethod.value).toBe('GET')
     expect(queryState.value.select).toEqual(['ID'])
-    expect(globalThis.fetch).toHaveBeenCalledWith('/__odx__/schema?service=Northwind')
+    expect(globalThis.fetch).toHaveBeenCalledWith('/__odx__/schema?service=Northwind', { signal: expect.any(AbortSignal) })
   })
 
   it('does not restore cached entity preview state for colliding service and entity names', async () => {
@@ -1227,6 +1281,6 @@ describe('explorer State Composable', () => {
     expect(previewData.value).toBeNull()
     expect(queryInput.value).toBe('?')
     expect(queryState.value.select).toEqual([])
-    expect(globalThis.fetch).toHaveBeenCalledWith('/__odx__/schema?service=Northwind%3AProducts')
+    expect(globalThis.fetch).toHaveBeenCalledWith('/__odx__/schema?service=Northwind%3AProducts', { signal: expect.any(AbortSignal) })
   })
 })

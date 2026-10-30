@@ -2,24 +2,14 @@ import type { Association, AssociationEnd, EntityMapping, NavigationProperty } f
 import type { NodeTypesObject } from '@vue-flow/core'
 import { useVueFlow } from '@vue-flow/core'
 import ELK from 'elkjs/lib/elk.bundled.js'
+import { useNuxtApp } from 'nuxt/app'
+import { onScopeDispose } from 'vue'
 import SchemaNode from '../components/SchemaNode.vue'
+import { createAppState } from '../utils/appState'
+import { createLatestRequest } from '../utils/latestRequest'
 import { buildSchemaEndpointUrl } from './useODataState'
 
 const elk = new ELK()
-
-// Shared State (Singleton)
-const schemaData = ref<any>(null)
-const loading = ref(false)
-const isReady = ref(false)
-const isFullscreen = ref(false)
-const containerRef = ref<HTMLElement | null>(null)
-const needsInitialFit = ref(false)
-
-if (typeof document !== 'undefined') {
-  document.addEventListener('fullscreenchange', () => {
-    isFullscreen.value = !!document.fullscreenElement
-  })
-}
 
 export interface SchemaExplorer {
   selectedService: Ref<any>
@@ -38,8 +28,32 @@ export interface SchemaExplorer {
   fitToScreen: () => void
 }
 
-export function useSchemaExplorer(): SchemaExplorer {
-  const { selectedService } = useSharedODataState()
+function createSchemaExplorer(): SchemaExplorer {
+  const schemaData = ref<any>(null)
+  const loading = ref(false)
+  const isReady = ref(false)
+  const isFullscreen = ref(false)
+  const containerRef = ref<HTMLElement | null>(null)
+  const needsInitialFit = ref(false)
+
+  const schemaRequest = createLatestRequest()
+  let layoutVersion = 0
+  let disposed = false
+  function syncFullscreen(): void {
+    isFullscreen.value = !!document.fullscreenElement
+  }
+  if (typeof document !== 'undefined')
+    document.addEventListener('fullscreenchange', syncFullscreen)
+  onScopeDispose(() => {
+    disposed = true
+    layoutVersion++
+    if (typeof document !== 'undefined')
+      document.removeEventListener('fullscreenchange', syncFullscreen)
+    schemaData.value = null
+    containerRef.value = null
+  })
+
+  const { selectedService, updateServiceHealth } = useSharedODataState()
   const { setNodes, setEdges, fitView, onPaneReady, viewport, setViewport, nodes: globalNodes, edges: globalEdges } = useVueFlow()
   const toast = useToast()
 
@@ -56,13 +70,16 @@ export function useSchemaExplorer(): SchemaExplorer {
       }
     }
     else {
+      schemaRequest.cancel()
+      layoutVersion++
+      loading.value = false
       schemaData.value = null
       isReady.value = false
       needsInitialFit.value = false
       setNodes([])
       setEdges([])
     }
-  }, { immediate: true })
+  }, { immediate: true, flush: 'sync' })
 
   // Triggered when the Schema tab is opened and Vue Flow is ready
   onPaneReady(() => {
@@ -77,9 +94,12 @@ export function useSchemaExplorer(): SchemaExplorer {
       return
     }
 
+    const version = layoutVersion
     await nextTick()
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
+        if (disposed || version !== layoutVersion)
+          return
         try {
           fitView({ padding: 0.2, duration: 0 })
           isReady.value = true
@@ -93,17 +113,22 @@ export function useSchemaExplorer(): SchemaExplorer {
   }
 
   async function fetchSchema(serviceName: string): Promise<void> {
-    if (loading.value)
-      return
-
-    const { updateServiceHealth } = useSharedODataState()
-
+    const request = schemaRequest.begin()
+    layoutVersion++
+    schemaData.value = null
+    setNodes([])
+    setEdges([])
     loading.value = true
     isReady.value = false
     try {
-      const res = await fetch(buildSchemaEndpointUrl(serviceName))
+      const res = await fetch(buildSchemaEndpointUrl(serviceName), { signal: request.signal })
+      if (!request.isCurrent())
+        return
       if (res.ok) {
-        schemaData.value = await res.json()
+        const body = await res.json()
+        if (!request.isCurrent())
+          return
+        schemaData.value = body
         updateServiceHealth(serviceName, schemaData.value?.metadata?.stale ? 'degraded' : 'online')
         await generateGraph(true)
       }
@@ -112,11 +137,14 @@ export function useSchemaExplorer(): SchemaExplorer {
       }
     }
     catch (e) {
+      if (!request.isCurrent())
+        return
       console.error('[SchemaExplorer] Failed to fetch schema', e)
       updateServiceHealth(serviceName, 'offline')
     }
     finally {
-      loading.value = false
+      if (request.isCurrent())
+        loading.value = false
     }
   }
 
@@ -125,6 +153,7 @@ export function useSchemaExplorer(): SchemaExplorer {
       return
     }
 
+    const version = ++layoutVersion
     const newNodes: any[] = []
     const newEdges: any[] = []
 
@@ -211,6 +240,8 @@ export function useSchemaExplorer(): SchemaExplorer {
       }
 
       const layoutedGraph = await elk.layout(elkGraph)
+      if (disposed || version !== layoutVersion)
+        return
       newNodes.forEach((node) => {
         const elkNode = layoutedGraph.children?.find((c: any) => c.id === node.id)
         if (elkNode) {
@@ -230,6 +261,8 @@ export function useSchemaExplorer(): SchemaExplorer {
       }
     }
     catch (err) {
+      if (disposed || version !== layoutVersion)
+        return
       console.error('[SchemaExplorer] ELK layout failed', err)
       setNodes(newNodes)
       setEdges(newEdges)
@@ -258,6 +291,8 @@ export function useSchemaExplorer(): SchemaExplorer {
         element.requestFullscreen().then(() => {
           isFullscreen.value = true
           setTimeout(() => {
+            if (disposed)
+              return
             const newWidth = element.offsetWidth
             const newHeight = element.offsetHeight
             const dx = (newWidth - oldWidth) / 2
@@ -285,6 +320,8 @@ export function useSchemaExplorer(): SchemaExplorer {
 
       if (wasSchemaFullscreen) {
         setTimeout(() => {
+          if (disposed)
+            return
           const newWidth = element.offsetWidth
           const newHeight = element.offsetHeight
           const dx = (newWidth - oldWidth) / 2
@@ -377,4 +414,10 @@ export function useSchemaExplorer(): SchemaExplorer {
     toggleFullscreen,
     fitToScreen,
   }
+}
+
+const getAppSchemaExplorer = createAppState(createSchemaExplorer)
+
+export function useSchemaExplorer(): SchemaExplorer {
+  return getAppSchemaExplorer(useNuxtApp().vueApp)
 }

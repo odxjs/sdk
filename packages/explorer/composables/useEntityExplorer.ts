@@ -1,18 +1,11 @@
 import type { EntityMapping } from '@me-tools/odx-core'
 import type { EditorState } from './useODataState'
 import { flattenOData } from '@me-tools/odx-core'
+import { useNuxtApp } from 'nuxt/app'
+import { onScopeDispose } from 'vue'
+import { createAppState } from '../utils/appState'
 import { buildEntityPreviewCacheKey, buildRuntimeProxyUrl } from './useODataState'
 
-const editor = ref<EditorState>({
-  show: false,
-  mode: 'view',
-  json: '',
-  loading: false,
-  error: null,
-  original: null,
-})
-
-const showLoadingIndicator = ref(false)
 const RE_TRAILING_SLASH = /\/$/
 const RE_ODATA_NUMERIC_TYPE = /(?:^|\.)(?:Byte|SByte|Int16|Int32|Int64|Decimal|Double|Single)$/
 const RE_NUMERIC_LITERAL = /^[+-]?(?:\d+|\d*\.\d+)(?:e[+-]?\d+)?$/i
@@ -43,7 +36,18 @@ export interface EntityExplorer {
   downloadJson: () => void
 }
 
-export function useEntityExplorer(): EntityExplorer {
+function createEntityExplorer(): EntityExplorer {
+  const editor = ref<EditorState>({
+    show: false,
+    mode: 'view',
+    json: '',
+    loading: false,
+    error: null,
+    original: null,
+  })
+
+  const showLoadingIndicator = ref(false)
+
   const toast = useToast()
   const {
     selectedService,
@@ -60,9 +64,16 @@ export function useEntityExplorer(): EntityExplorer {
     entitySchema,
     entitySchemaLoading,
     entityDataCache,
+    previewRequest,
+    updateServiceHealth,
   } = useSharedODataState()
 
   let loadingTimeout: ReturnType<typeof setTimeout> | null = null
+  onScopeDispose(() => {
+    if (loadingTimeout)
+      clearTimeout(loadingTimeout)
+    editor.value = { show: false, mode: 'view', json: '', loading: false, error: null, original: null }
+  })
 
   function getCurrentEntitySchema(): any {
     const entityName = selectedEntity.value
@@ -217,40 +228,49 @@ export function useEntityExplorer(): EntityExplorer {
       return
     }
 
-    const { updateServiceHealth } = useSharedODataState()
-    const svcName = selectedService.value.name
+    const request = previewRequest.begin()
+    const service = selectedService.value
+    const entity = selectedEntity.value
+    const svcName = service.name
+    const query = queryInput.value
+    const method = queryMethod.value
+    const submittedQueryState = JSON.parse(JSON.stringify(queryState.value))
+    const cacheKey = buildEntityPreviewCacheKey(svcName, entity)
 
     previewLoading.value = true
     previewError.value = null
     try {
-      const isDirect = selectedService.value.strategy === 'direct'
+      const isDirect = service.strategy === 'direct'
       let urlPath = ''
 
       if (isDirect && !useCORSBridge.value) {
         // True Direct Mode: Browser -> OData Service (Only if user explicitly opted-out of bridge)
-        const baseUrl = selectedService.value.url?.replace(RE_TRAILING_SLASH, '')
-        urlPath = `${baseUrl}/${selectedEntity.value}`
+        const baseUrl = service.url?.replace(RE_TRAILING_SLASH, '')
+        urlPath = `${baseUrl}/${entity}`
       }
       else {
         // Proxied Mode: Browser -> Nitro -> OData Service
         // This is the default even for 'direct' services to avoid CORS issues in dev.
-        const route = selectedService.value.route || selectedService.value.name.toLowerCase()
-        urlPath = buildRuntimeProxyUrl(`${config.value.basePath}/${route}/${selectedEntity.value}`)
+        const route = service.route || svcName.toLowerCase()
+        urlPath = buildRuntimeProxyUrl(`${config.value.basePath}/${route}/${entity}`)
       }
 
-      if (queryInput.value && queryInput.value !== '?') {
-        const q = queryInput.value.startsWith('?') ? queryInput.value : `?${queryInput.value}`
+      if (query && query !== '?') {
+        const q = query.startsWith('?') ? query : `?${query}`
         urlPath += q
       }
 
       const res = await fetch(urlPath, {
-        method: queryMethod.value,
+        method,
+        signal: request.signal,
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
           ...sessionHeaders.value,
         },
       })
+      if (!request.isCurrent())
+        return
       if (!res.ok) {
         const errorText = await res.text().catch(() => '')
         let statusMessage = res.statusText || `Server Error ${res.status}`
@@ -276,6 +296,8 @@ export function useEntityExplorer(): EntityExplorer {
           }
         }
 
+        if (!request.isCurrent())
+          return
         if (res.status >= 500 && !upstreamResponded) {
           updateServiceHealth(svcName, 'offline')
         }
@@ -283,8 +305,10 @@ export function useEntityExplorer(): EntityExplorer {
         throw new Error(statusMessage)
       }
 
-      updateServiceHealth(svcName, 'online')
       const responseText = await res.text()
+      if (!request.isCurrent())
+        return
+      updateServiceHealth(svcName, 'online')
       let data: any
       try {
         data = JSON.parse(responseText)
@@ -294,7 +318,7 @@ export function useEntityExplorer(): EntityExplorer {
       }
 
       // For non-GET requests (POST, PUT, PATCH, DELETE), we show the response in the editor
-      if (queryMethod.value !== 'GET') {
+      if (method !== 'GET') {
         editor.value = {
           show: true,
           mode: 'response',
@@ -312,34 +336,33 @@ export function useEntityExplorer(): EntityExplorer {
       previewData.value = dataArray
 
       // Update cache
-      const cacheKey = buildEntityPreviewCacheKey(selectedService.value.name, selectedEntity.value)
       entityDataCache.value[cacheKey] = {
         data: [...dataArray],
         error: null,
-        query: queryInput.value,
-        method: queryMethod.value,
-        queryState: JSON.parse(JSON.stringify(queryState.value)),
+        query,
+        method,
+        queryState: submittedQueryState,
       }
     }
     catch (e: unknown) {
+      if (!request.isCurrent())
+        return
       const msg = (e as Error).message
       previewError.value = msg
       previewData.value = []
 
       // Cache the error state too
-      if (selectedService.value && selectedEntity.value) {
-        const cacheKey = buildEntityPreviewCacheKey(selectedService.value.name, selectedEntity.value)
-        entityDataCache.value[cacheKey] = {
-          data: [],
-          error: msg,
-          query: queryInput.value,
-          method: queryMethod.value,
-          queryState: JSON.parse(JSON.stringify(queryState.value)),
-        }
+      entityDataCache.value[cacheKey] = {
+        data: [],
+        error: msg,
+        query,
+        method,
+        queryState: submittedQueryState,
       }
     }
     finally {
-      previewLoading.value = false
+      if (request.isCurrent())
+        previewLoading.value = false
     }
   }
 
@@ -508,4 +531,10 @@ export function useEntityExplorer(): EntityExplorer {
     downloadJson,
     queryState,
   }
+}
+
+const getAppEntityExplorer = createAppState(createEntityExplorer)
+
+export function useEntityExplorer(): EntityExplorer {
+  return getAppEntityExplorer(useNuxtApp().vueApp)
 }

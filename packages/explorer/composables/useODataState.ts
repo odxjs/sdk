@@ -1,4 +1,8 @@
 import type { ODataLog as CoreODataLog, ProxyTraceEntry as CoreProxyTraceEntry, EntityMapping, ODataServiceConfig } from '@me-tools/odx-core'
+import { useNuxtApp } from 'nuxt/app'
+import { onScopeDispose } from 'vue'
+import { createAppState } from '../utils/appState'
+import { createLatestRequest } from '../utils/latestRequest'
 
 const RE_ABSOLUTE_HTTP_URL = /^https?:\/\//i
 const RE_LEADING_SLASHES = /^\/+/
@@ -204,45 +208,6 @@ export function buildEntityPreviewCacheKey(service: string, entity: string): str
   return JSON.stringify([service, entity])
 }
 
-// Global Singleton state
-const activeTab = ref('overview')
-const logs = ref<ODataLog[]>([])
-const config = ref<ODataConfig>({ basePath: '/__odx__', mode: 'sdk', services: [] })
-const selectedService = ref<ODataServiceState | null>(null)
-const selectedEntity = ref<string | null>(null)
-const generatingStatus = ref<Record<string, boolean>>({})
-const sessionHeaders = ref<Record<string, string>>({})
-const logFilterService = ref<string | null>(null)
-const logFilterStatus = ref<LogFilterStatus>('all')
-const logSearch = ref('')
-const useCORSBridge = ref(true)
-const selectedTraceLogId = ref<string | null>(null)
-const globalViewMode = ref<'explorer' | 'schema'>('explorer')
-
-// Entity Preview state
-const previewLoading = ref(false)
-const previewError = ref<string | null>(null)
-const previewData = ref<Record<string, any>[] | null>(null)
-const queryInput = ref('?')
-const queryMethod = ref('GET')
-const queryState = ref<VisualQueryState>(getDefaultQueryState())
-const entitySchema = ref<any>(null)
-const entitySchemaLoading = ref(false)
-
-// Cache for entity data to avoid reloading when switching entities
-const entityDataCache = ref<Record<string, {
-  data: any[]
-  error: string | null
-  query: string
-  method: string
-  queryState: VisualQueryState
-}>>({})
-
-// Schema Explorer state
-const initializedServices = ref(new Set<string>())
-const schemaFocusedServices = ref(new Set<string>())
-const lastSelectedServiceForGraph = ref<string | null>(null)
-
 const DEGRADED_STORAGE_KEY = 'odx:degraded-services'
 const LOG_SEARCH_SEPARATOR_RE = /\s+/
 
@@ -267,9 +232,8 @@ function saveDegradedServices(overrides: Record<string, string>): void {
   catch {}
 }
 
-const serviceHealthOverrides = ref<Record<string, 'online' | 'offline' | 'checking' | 'degraded'>>(loadDegradedServices())
-
 export interface SharedODataState {
+  previewRequest: ReturnType<typeof createLatestRequest>
   activeTab: Ref<string>
   logs: Ref<ODataLog[]>
   config: Ref<ODataConfig>
@@ -313,7 +277,56 @@ export interface SharedODataState {
   updateServiceHealth: (name: string, health: 'online' | 'offline' | 'checking' | 'degraded', force?: boolean) => void
 }
 
-export function useSharedODataState(): SharedODataState {
+function createSharedODataState(): SharedODataState {
+  const previewRequest = createLatestRequest()
+  const schemaRequest = createLatestRequest()
+  const activeTab = ref('overview')
+  const logs = ref<ODataLog[]>([])
+  const config = ref<ODataConfig>({ basePath: '/__odx__', mode: 'sdk', services: [] })
+  const selectedService = ref<ODataServiceState | null>(null)
+  const selectedEntity = ref<string | null>(null)
+  const generatingStatus = ref<Record<string, boolean>>({})
+  const sessionHeaders = ref<Record<string, string>>({})
+  const logFilterService = ref<string | null>(null)
+  const logFilterStatus = ref<LogFilterStatus>('all')
+  const logSearch = ref('')
+  const useCORSBridge = ref(true)
+  const selectedTraceLogId = ref<string | null>(null)
+  const globalViewMode = ref<'explorer' | 'schema'>('explorer')
+
+  // Entity Preview state
+  const previewLoading = ref(false)
+  const previewError = ref<string | null>(null)
+  const previewData = ref<Record<string, any>[] | null>(null)
+  const queryInput = ref('?')
+  const queryMethod = ref('GET')
+  const queryState = ref<VisualQueryState>(getDefaultQueryState())
+  const entitySchema = ref<any>(null)
+  const entitySchemaLoading = ref(false)
+
+  // Cache for entity data to avoid reloading when switching entities
+  const entityDataCache = ref<Record<string, {
+    data: any[]
+    error: string | null
+    query: string
+    method: string
+    queryState: VisualQueryState
+  }>>({})
+
+  // Schema Explorer state
+  const initializedServices = ref(new Set<string>())
+  const schemaFocusedServices = ref(new Set<string>())
+  const lastSelectedServiceForGraph = ref<string | null>(null)
+
+  const serviceHealthOverrides = ref<Record<string, 'online' | 'offline' | 'checking' | 'degraded'>>(loadDegradedServices())
+
+  onScopeDispose(() => {
+    sessionHeaders.value = {}
+    logs.value = []
+    entityDataCache.value = {}
+    previewData.value = null
+  })
+
   function updateServiceHealth(name: string, health: 'online' | 'offline' | 'checking' | 'degraded', force = false): void {
     // Background schema checks must not clear degraded state; only a forced
     // refresh can confirm that the latest metadata is usable again.
@@ -481,7 +494,7 @@ export function useSharedODataState(): SharedODataState {
   watch(config, (data) => {
     if (selectedService.value) {
       const currentService = selectedService.value
-      const updated = data.services.find((s: any) => s.name === currentService.name)
+      const updated = services.value.find(s => s.name === currentService.name)
       if (updated) {
         selectedService.value = updated
         if (selectedEntity.value && !serviceHasEntity(updated, selectedEntity.value)) {
@@ -544,7 +557,69 @@ export function useSharedODataState(): SharedODataState {
     logSearch.value = ''
   }
 
+  // Watch for selectedEntity changes to update the entitySchema and restore cached data
+  watch([() => selectedService.value?.name, selectedEntity], async ([svcName, newEntity]) => {
+    previewRequest.cancel()
+    previewLoading.value = false
+    schemaRequest.cancel()
+    entitySchema.value = null
+    entitySchemaLoading.value = false
+    if (!newEntity || !svcName) {
+      entitySchema.value = null
+      previewData.value = null
+      previewError.value = null
+      return
+    }
+
+    const request = schemaRequest.begin()
+    const cacheKey = buildEntityPreviewCacheKey(svcName, newEntity)
+    const cached = entityDataCache.value[cacheKey]
+
+    if (cached) {
+      previewData.value = cached.data
+      previewError.value = cached.error
+      queryInput.value = cached.query
+      queryMethod.value = cached.method
+      queryState.value = JSON.parse(JSON.stringify(cached.queryState))
+    }
+    else {
+      previewData.value = null
+      previewError.value = null
+      queryMethod.value = 'GET'
+      queryInput.value = '?'
+      queryState.value = getDefaultQueryState()
+    }
+
+    entitySchemaLoading.value = true
+    try {
+      const res = await fetch(buildSchemaEndpointUrl(svcName), { signal: request.signal })
+      if (!request.isCurrent())
+        return
+      if (res.ok) {
+        const body = await res.json()
+        if (!request.isCurrent())
+          return
+        entitySchema.value = body
+        updateServiceHealth(svcName, body?.metadata?.stale ? 'degraded' : 'online')
+      }
+      else {
+        updateServiceHealth(svcName, 'offline')
+      }
+    }
+    catch (e) {
+      if (!request.isCurrent())
+        return
+      console.error(`[ODataState] Failed to fetch schema for ${newEntity}`, e)
+      updateServiceHealth(svcName, 'offline')
+    }
+    finally {
+      if (request.isCurrent())
+        entitySchemaLoading.value = false
+    }
+  }, { flush: 'sync' })
+
   return {
+    previewRequest,
     activeTab,
     logs,
     config,
@@ -583,53 +658,8 @@ export function useSharedODataState(): SharedODataState {
   }
 }
 
-// Watch for selectedEntity changes to update the entitySchema and restore cached data
-watch(selectedEntity, async (newEntity) => {
-  const { updateServiceHealth } = useSharedODataState()
+const getAppState = createAppState(createSharedODataState)
 
-  if (!newEntity || !selectedService.value) {
-    entitySchema.value = null
-    previewData.value = null
-    previewError.value = null
-    return
-  }
-
-  const svcName = selectedService.value.name
-  const cacheKey = buildEntityPreviewCacheKey(svcName, newEntity)
-  const cached = entityDataCache.value[cacheKey]
-
-  if (cached) {
-    previewData.value = cached.data
-    previewError.value = cached.error
-    queryInput.value = cached.query
-    queryMethod.value = cached.method
-    queryState.value = JSON.parse(JSON.stringify(cached.queryState))
-  }
-  else {
-    previewData.value = null
-    previewError.value = null
-    queryMethod.value = 'GET'
-    queryInput.value = '?'
-    queryState.value = getDefaultQueryState()
-  }
-
-  entitySchemaLoading.value = true
-  try {
-    const res = await fetch(buildSchemaEndpointUrl(svcName))
-    if (res.ok) {
-      const body = await res.json()
-      entitySchema.value = body
-      updateServiceHealth(svcName, body?.metadata?.stale ? 'degraded' : 'online')
-    }
-    else {
-      updateServiceHealth(svcName, 'offline')
-    }
-  }
-  catch (e) {
-    console.error(`[ODataState] Failed to fetch schema for ${newEntity}`, e)
-    updateServiceHealth(svcName, 'offline')
-  }
-  finally {
-    entitySchemaLoading.value = false
-  }
-})
+export function useSharedODataState(): SharedODataState {
+  return getAppState(useNuxtApp().vueApp)
+}
