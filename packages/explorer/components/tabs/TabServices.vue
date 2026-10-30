@@ -238,6 +238,7 @@ const actionItems = computed((): DropdownMenuItem[][] => {
         <div class="flex items-center gap-4 min-w-50 flex-1">
           <UButton
             icon="i-lucide-chevron-left"
+            aria-label="Back to services"
             color="neutral"
             variant="ghost"
             @click="selectedService = null; selectedEntity = null"

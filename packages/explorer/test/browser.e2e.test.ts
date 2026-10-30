@@ -27,7 +27,7 @@ describe('explorer real browser usage', async () => {
     await backend?.close()
   })
 
-  async function openExplorer(activation: 'pointer' | 'keyboard' | null, configStatus?: number) {
+  async function openExplorer(activation: 'pointer' | 'keyboard' | null, configStatus?: number, contractBackend = backend) {
     const context = await (await getBrowser()).newContext({ viewport: { width: 1440, height: 950 }, locale: 'en-US' })
     const page = await context.newPage()
     const errors: string[] = []
@@ -43,7 +43,7 @@ describe('explorer real browser usage', async () => {
         return
       }
       if ((target.pathname.startsWith('/__odx__/') && !target.pathname.startsWith('/__odx__/client/')) || target.pathname.startsWith('/api/odx/')) {
-        const response = await route.fetch({ url: `${backend.origin}${target.pathname}${target.search}` })
+        const response = await route.fetch({ url: `${contractBackend.origin}${target.pathname}${target.search}` })
         await route.fulfill({ response })
       }
       else {
@@ -128,13 +128,152 @@ describe('explorer real browser usage', async () => {
     }
   })
 
+  it('keeps session headers on their original service across actual service navigation', async () => {
+    const contract = await createExplorerBrowserBackend({ secondService: true })
+    let opened: Awaited<ReturnType<typeof openExplorer>> | undefined
+    try {
+      opened = await openExplorer('pointer', undefined, contract)
+      const { page, errors } = opened
+      const editor = page.getByRole('dialog')
+      await page.getByRole('button', { name: 'Headers', exact: true }).click()
+      await editor.getByRole('textbox').fill(JSON.stringify({ 'X-Odx-Browser-Session': 'catalog-only' }))
+      await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
+      await expect.poll(() => editor.count()).toBe(0)
+      await expect.poll(() => contract.requests.some(request => request.sessionHeader === 'catalog-only')).toBe(true)
+      await page.getByRole('button', { name: 'Back to services', exact: true }).click()
+      await page.getByRole('link', { name: 'OtherCatalog', exact: true }).press('Enter')
+      await page.getByText('Products', { exact: true }).filter({ visible: true }).first().click()
+      contract.requests.splice(0)
+      await page.getByRole('button', { name: 'Execute', exact: true }).click()
+      await expect.poll(() => page.getByRole('row').filter({ hasText: 'Zero desk' }).isVisible()).toBe(true)
+      expect(contract.requests.filter(request => request.url === '/odata/Products').map(request => request.sessionHeader)).toEqual([undefined])
+      await page.getByRole('button', { name: 'Headers', exact: true }).click()
+      expect(JSON.parse(await editor.getByRole('textbox').inputValue())).toEqual({})
+      await editor.getByRole('button', { name: 'Cancel', exact: true }).click()
+      await page.getByRole('button', { name: 'Back to services', exact: true }).click()
+      await page.getByRole('link', { name: 'LocalCatalog', exact: true }).press('Enter')
+      await page.getByText('Products', { exact: true }).filter({ visible: true }).first().click()
+      await page.getByRole('button', { name: 'Headers', exact: true }).click()
+      expect(JSON.parse(await editor.getByRole('textbox').inputValue())).toEqual({ 'X-Odx-Browser-Session': 'catalog-only' })
+      expect(errors).toEqual([])
+    }
+    finally {
+      await opened?.page.unrouteAll({ behavior: 'wait' })
+      await opened?.context.close()
+      await contract.close()
+    }
+  })
+
+  it.each(['v2', 'v4'] as const)('edits and deletes an escaped composite identity over real %s transport', async (version) => {
+    const contract = await createExplorerBrowserBackend({ version, compositeKey: true })
+    let opened: Awaited<ReturnType<typeof openExplorer>> | undefined
+    try {
+      opened = await openExplorer('keyboard', undefined, contract)
+      const { page, errors } = opened
+      const row = page.getByRole('row').filter({ hasText: 'Zero desk' })
+      await row.getByRole('button', { name: 'Edit record', exact: true }).click()
+      const editor = page.getByRole('dialog')
+      const method = version === 'v2' ? 'MERGE' : 'PATCH'
+      await expect.poll(() => editor.getByText(method, { exact: true }).isVisible()).toBe(true)
+      await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
+      await expect.poll(() => editor.count()).toBe(0)
+      const suffix = version === 'v2' ? 'L' : ''
+      const paths = [`/odata/Products(Tenant='O''Brien%2F%26%3F',ID=0${suffix})`, `/odata/Products(ID=0${suffix},Tenant='O''Brien%2F%26%3F')`]
+      expect(paths).toContain(contract.requests.find(request => request.method === method)?.url)
+      page.once('dialog', async dialog => dialog.accept())
+      await row.getByRole('button', { name: 'Delete record', exact: true }).click()
+      await expect.poll(() => contract.requests.some(request => request.method === 'DELETE')).toBe(true)
+      expect(paths).toContain(contract.requests.find(request => request.method === 'DELETE')?.url)
+      expect(contract.requests.some(request => request.method === 'POST')).toBe(false)
+      expect(errors).toEqual([])
+    }
+    finally {
+      await opened?.page.unrouteAll({ behavior: 'wait' })
+      await opened?.context.close()
+      await contract.close()
+    }
+  })
+
+  it.each([200, 409])('keeps a later record editor open when an earlier dispatched write finishes with HTTP %i', async (status) => {
+    const { context, page, errors } = await openExplorer('pointer')
+    let release!: () => void
+    const released = new Promise<void>(resolve => release = resolve)
+    let captured!: () => void
+    const dispatched = new Promise<void>(resolve => captured = resolve)
+    try {
+      await page.getByRole('combobox', { name: 'Request method', exact: true }).click()
+      await page.getByRole('option', { name: 'DELETE', exact: true }).click()
+      await page.route('**/api/odx/catalog/Products*', async (route) => {
+        if (route.request().method() !== 'PATCH') {
+          await route.fallback()
+          return
+        }
+        const response = status === 200 ? await route.fetch({ url: `${backend.origin}/api/odx/catalog/Products(0)` }) : null
+        captured()
+        await released
+        if (response)
+          await route.fulfill({ response })
+        else
+          await route.fulfill({ status, json: { message: 'Synthetic late conflict' } })
+      })
+      await page.getByRole('row').filter({ hasText: 'Zero desk' }).getByRole('button', { name: 'Edit record', exact: true }).click()
+      const editor = page.getByRole('dialog')
+      await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
+      await dispatched
+      await editor.getByRole('button', { name: 'Cancel', exact: true }).click()
+      await expect.poll(() => editor.count()).toBe(0)
+      const nextRow = page.getByRole('row').filter({ has: page.getByRole('cell', { name: 'Desk', exact: true }) })
+      await nextRow.getByRole('button', { name: 'Edit record', exact: true }).click()
+      release()
+      await expect.poll(() => page.getByText(status === 200 ? 'Item updated successfully' : 'Synthetic late conflict', { exact: true }).isVisible()).toBe(true)
+      await expect.poll(() => editor.isVisible()).toBe(true)
+      expect(JSON.parse(await editor.locator('textarea').inputValue())).toMatchObject({ ID: 1, Name: 'Desk' })
+      if (status === 200) {
+        expect(backend.requests.find(request => request.method === 'PATCH')).toMatchObject({ url: '/odata/Products(0)' })
+        expect(backend.requests.filter(request => request.method !== 'GET').map(request => request.method)).toEqual(['PATCH'])
+      }
+      else {
+        expect(backend.requests.every(request => request.method === 'GET')).toBe(true)
+      }
+      await editor.getByRole('button', { name: 'Cancel', exact: true }).click()
+      expect(errors.filter(error => !error.includes('status of 409'))).toEqual([])
+    }
+    finally {
+      release()
+      await page.unrouteAll({ behavior: 'wait' })
+      await context.close()
+    }
+  })
+
+  it('rejects changed keys before transport and permits a partial update without keys', async () => {
+    const { context, page, errors } = await openExplorer('pointer')
+    try {
+      await page.getByRole('row').filter({ hasText: 'Zero desk' }).getByRole('button', { name: 'Edit record', exact: true }).click()
+      const editor = page.getByRole('dialog')
+      await editor.locator('textarea').fill(JSON.stringify({ ID: 5, Name: 'Wrong identity' }))
+      await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
+      await expect.poll(() => editor.getByText('Key changes are not supported. No request was sent.', { exact: true }).isVisible()).toBe(true)
+      expect(backend.requests.every(request => request.method === 'GET')).toBe(true)
+      await editor.locator('textarea').fill(JSON.stringify({ Name: 'Renamed desk' }))
+      await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
+      await expect.poll(() => editor.count()).toBe(0)
+      expect(backend.requests.find(request => request.method === 'PATCH')).toMatchObject({ url: '/odata/Products(0)', body: JSON.stringify({ Name: 'Renamed desk' }) })
+      await expect.poll(() => page.getByRole('row').filter({ hasText: 'Renamed desk' }).isVisible()).toBe(true)
+      expect(errors).toEqual([])
+    }
+    finally {
+      await page.unrouteAll({ behavior: 'wait' })
+      await context.close()
+    }
+  })
+
   it('keeps an unkeyed record edit open with an error and sends no mutation', async () => {
     const { context, page, errors } = await openExplorer('pointer')
     try {
       await page.getByRole('row').filter({ hasText: 'Unkeyed desk' }).getByRole('button', { name: 'Edit record', exact: true }).click()
       const editor = page.getByRole('dialog')
       await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
-      await expect.poll(() => editor.getByText('Cannot update this record without a supported ID. No request was sent.', { exact: true }).isVisible()).toBe(true)
+      await expect.poll(() => editor.getByText('Record key ID is missing or invalid. No request was sent.', { exact: true }).isVisible()).toBe(true)
       expect(backend.requests.every(request => request.method === 'GET')).toBe(true)
       await editor.getByRole('button', { name: 'Cancel', exact: true }).click()
       await expect.poll(() => editor.count()).toBe(0)

@@ -1,4 +1,5 @@
 import type { ODataLog as CoreODataLog, ProxyTraceEntry as CoreProxyTraceEntry, EntityMapping, ODataServiceConfig } from '@me-tools/odx-core'
+import type { ExplorerMutationTarget } from '../utils/recordIdentity'
 import { useNuxtApp } from 'nuxt/app'
 import { onScopeDispose } from 'vue'
 import { createAppState } from '../utils/appState'
@@ -95,6 +96,9 @@ export interface EditorState {
   error: string | null
   original: any
   context?: string
+  headersServiceName?: string
+  target?: ExplorerMutationTarget
+  targetError?: string
 }
 
 function getDefaultQueryState(): VisualQueryState {
@@ -250,6 +254,9 @@ export interface SharedODataState {
   selectedEntity: Ref<string | null>
   generatingStatus: Ref<Record<string, boolean>>
   sessionHeaders: Ref<Record<string, string>>
+  getSessionHeaders: (serviceName: string) => Record<string, string>
+  setSessionHeaders: (serviceName: string, headers: Record<string, string>) => void
+  clearSessionHeaders: () => void
   logFilterService: Ref<string | null>
   logFilterStatus: Ref<LogFilterStatus>
   logSearch: Ref<string>
@@ -261,6 +268,7 @@ export interface SharedODataState {
   previewLoading: Ref<boolean>
   previewError: Ref<string | null>
   previewData: Ref<Record<string, any>[] | null>
+  previewOwner: Ref<{ serviceName: string, entitySet: string } | null>
   queryInput: Ref<string>
   queryMethod: Ref<string>
   queryState: Ref<VisualQueryState>
@@ -301,7 +309,23 @@ function createSharedODataState(): SharedODataState {
   const selectedService = ref<ODataServiceState | null>(null)
   const selectedEntity = ref<string | null>(null)
   const generatingStatus = ref<Record<string, boolean>>({})
-  const sessionHeaders = ref<Record<string, string>>({})
+  const headersByService = ref(new Map<string, Record<string, string>>())
+  function getSessionHeaders(serviceName: string): Record<string, string> {
+    return headersByService.value.get(serviceName) ?? {}
+  }
+  function setSessionHeaders(serviceName: string, headers: Record<string, string>): void {
+    headersByService.value.set(serviceName, { ...headers })
+  }
+  function clearSessionHeaders(): void {
+    headersByService.value.clear()
+  }
+  const sessionHeaders = computed({
+    get: () => selectedService.value ? getSessionHeaders(selectedService.value.name) : {},
+    set: (headers: Record<string, string>) => {
+      if (selectedService.value)
+        setSessionHeaders(selectedService.value.name, headers)
+    },
+  })
   const logFilterService = ref<string | null>(null)
   const logFilterStatus = ref<LogFilterStatus>('all')
   const logSearch = ref('')
@@ -313,6 +337,7 @@ function createSharedODataState(): SharedODataState {
   const previewLoading = ref(false)
   const previewError = ref<string | null>(null)
   const previewData = ref<Record<string, any>[] | null>(null)
+  const previewOwner = ref<{ serviceName: string, entitySet: string } | null>(null)
   const queryInput = ref('?')
   const queryMethod = ref('GET')
   const queryState = ref<VisualQueryState>(getDefaultQueryState())
@@ -336,10 +361,11 @@ function createSharedODataState(): SharedODataState {
   const serviceHealthOverrides = ref<Record<string, 'online' | 'offline' | 'checking' | 'degraded'>>(loadDegradedServices())
 
   onScopeDispose(() => {
-    sessionHeaders.value = {}
+    clearSessionHeaders()
     logs.value = []
     entityDataCache.value = {}
     previewData.value = null
+    previewOwner.value = null
   })
 
   function updateServiceHealth(name: string, health: 'online' | 'offline' | 'checking' | 'degraded', force = false): void {
@@ -384,7 +410,7 @@ function createSharedODataState(): SharedODataState {
       if (!res.ok) {
         if (res.status === 401 || res.status === 403) {
           config.value = { basePath: config.value.basePath, services: [] }
-          sessionHeaders.value = {}
+          clearSessionHeaders()
           entityDataCache.value = {}
         }
         throw new Error(`Explorer configuration unavailable (HTTP ${res.status}).`)
@@ -453,6 +479,7 @@ function createSharedODataState(): SharedODataState {
     selectedEntity.value = null
     entitySchema.value = null
     previewData.value = null
+    previewOwner.value = null
     previewError.value = null
     queryInput.value = '?'
     queryMethod.value = 'GET'
@@ -640,6 +667,7 @@ function createSharedODataState(): SharedODataState {
     if (!newEntity || !svcName) {
       entitySchema.value = null
       previewData.value = null
+      previewOwner.value = null
       previewError.value = null
       return
     }
@@ -650,6 +678,7 @@ function createSharedODataState(): SharedODataState {
 
     if (cached) {
       previewData.value = cached.data
+      previewOwner.value = { serviceName: svcName, entitySet: newEntity }
       previewError.value = cached.error
       queryInput.value = cached.query
       queryMethod.value = cached.method
@@ -657,6 +686,7 @@ function createSharedODataState(): SharedODataState {
     }
     else {
       previewData.value = null
+      previewOwner.value = null
       previewError.value = null
       queryMethod.value = 'GET'
       queryInput.value = '?'
@@ -703,6 +733,9 @@ function createSharedODataState(): SharedODataState {
     selectedEntity,
     generatingStatus,
     sessionHeaders,
+    getSessionHeaders,
+    setSessionHeaders,
+    clearSessionHeaders,
     logFilterService,
     logFilterStatus,
     logSearch,
@@ -714,6 +747,7 @@ function createSharedODataState(): SharedODataState {
     previewLoading,
     previewError,
     previewData,
+    previewOwner,
     queryInput,
     queryMethod,
     queryState,

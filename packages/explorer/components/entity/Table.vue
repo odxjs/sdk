@@ -75,8 +75,8 @@ function getRowData(row: any): Record<string, any> {
         <template #actions-cell="{ row }">
           <div class="flex items-center justify-center gap-2 w-30 shrink-0 sticky left-0 z-10">
             <UButton aria-label="View record" icon="i-lucide-eye" variant="ghost" color="neutral" size="sm" class="hover:text-primary-500 hover:bg-primary-500/10 transition-colors" @click="openEditor('view', getRowData(row))" />
-            <UButton aria-label="Edit record" icon="i-lucide-pencil" variant="ghost" color="neutral" size="sm" class="hover:text-primary-500 hover:bg-primary-500/10 transition-colors" @click="openEditor('update', getRowData(row))" />
-            <UButton aria-label="Delete record" icon="i-lucide-trash-2" variant="ghost" color="neutral" size="sm" class="hover:text-error-500 hover:bg-error-500/10 transition-colors" @click="deleteItem(getRowData(row).ID ?? getRowData(row).Id)" />
+            <UButton aria-label="Edit record" :disabled="entitySchemaLoading" icon="i-lucide-pencil" variant="ghost" color="neutral" size="sm" class="hover:text-primary-500 hover:bg-primary-500/10 transition-colors" @click="openEditor('update', getRowData(row))" />
+            <UButton aria-label="Delete record" :disabled="entitySchemaLoading" icon="i-lucide-trash-2" variant="ghost" color="neutral" size="sm" class="hover:text-error-500 hover:bg-error-500/10 transition-colors" @click="deleteItem(getRowData(row))" />
           </div>
         </template>
 

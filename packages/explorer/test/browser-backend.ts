@@ -22,6 +22,7 @@ interface ExplorerBrowserBackend {
   readonly serviceUrl: string
   readonly metadata: string
   readonly requests: RecordedRequest[]
+  readonly gatewayRequests: { path: string, url?: string }[]
   readonly reset: () => Promise<void>
   readonly close: () => Promise<void>
 }
@@ -43,12 +44,31 @@ async function stop(server: Server): Promise<void> {
 }
 
 /** Actual ODX handlers and a synthetic loopback OData service; no SAP credentials. */
-export async function createExplorerBrowserBackend(): Promise<ExplorerBrowserBackend> {
+export async function createExplorerBrowserBackend(options: { version?: 'v2' | 'v4', compositeKey?: boolean, secondService?: boolean } = {}): Promise<ExplorerBrowserBackend> {
   const directory = await mkdtemp(join(tmpdir(), 'odx-explorer-browser-'))
-  const xml = `<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0"><edmx:DataServices><Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="Browser"><EntityType Name="Product"><Key><PropertyRef Name="ID"/></Key><Property Name="ID" Type="Edm.Int32" Nullable="false"/><Property Name="Name" Type="Edm.String"/></EntityType><EntityType Name="Supplier"><Key><PropertyRef Name="ID"/></Key><Property Name="ID" Type="Edm.String"/><Property Name="Name" Type="Edm.String"/></EntityType><EntityContainer Name="Container"><EntitySet Name="Products" EntityType="Browser.Product"/><EntitySet Name="Suppliers" EntityType="Browser.Supplier"/></EntityContainer></Schema></edmx:DataServices></edmx:Edmx>`
+  const version = options.version ?? 'v4'
+  const edmxNamespace = version === 'v2' ? 'http://schemas.microsoft.com/ado/2007/06/edmx' : 'http://docs.oasis-open.org/odata/ns/edmx'
+  const edmNamespace = version === 'v2' ? 'http://schemas.microsoft.com/ado/2008/09/edm' : 'http://docs.oasis-open.org/odata/ns/edm'
+  const key = options.compositeKey ? '<PropertyRef Name="Tenant"/><PropertyRef Name="ID"/>' : '<PropertyRef Name="ID"/>'
+  const idType = options.compositeKey ? 'Edm.Int64' : 'Edm.Int32'
+  const xml = `<edmx:Edmx xmlns:edmx="${edmxNamespace}" Version="${version === 'v2' ? '1.0' : '4.0'}"><edmx:DataServices><Schema xmlns="${edmNamespace}" Namespace="Browser"><EntityType Name="Product"><Key>${key}</Key><Property Name="ID" Type="${idType}" Nullable="false"/>${options.compositeKey ? '<Property Name="Tenant" Type="Edm.String" Nullable="false"/>' : ''}<Property Name="Name" Type="Edm.String"/></EntityType><EntityType Name="Supplier"><Key><PropertyRef Name="ID"/></Key><Property Name="ID" Type="Edm.String"/><Property Name="Name" Type="Edm.String"/></EntityType><EntityContainer Name="Container"><EntitySet Name="Products" EntityType="Browser.Product"/><EntitySet Name="Suppliers" EntityType="Browser.Supplier"/></EntityContainer></Schema></edmx:DataServices></edmx:Edmx>`
+  // Named composite-key ordering is semantically insignificant in OData.
+  const suffix = version === 'v2' ? 'L' : ''
+  const mutationPaths = options.compositeKey
+    ? [`/odata/Products(Tenant='O''Brien%2F%26%3F',ID=0${suffix})`, `/odata/Products(ID=0${suffix},Tenant='O''Brien%2F%26%3F')`]
+    : ['/odata/Products(0)']
+  const initialProducts = (): Record<string, unknown>[] => [
+    { ID: 0, Name: 'Zero desk', ...(options.compositeKey ? { Tenant: 'O\'Brien/&?' } : {}) },
+    { ID: 1, Name: 'Desk' },
+    { Name: 'Unkeyed desk' },
+  ]
+  let products = initialProducts()
   const requests: RecordedRequest[] = []
+  const gatewayRequests: { path: string, url?: string }[] = []
   await mkdir(join(directory, 'odx', 'temp'), { recursive: true })
   await writeFile(join(directory, 'odx', 'temp', 'LocalCatalog.edmx'), xml)
+  if (options.secondService)
+    await writeFile(join(directory, 'odx', 'temp', 'OtherCatalog.edmx'), xml)
   const upstream = createServer(async (request, response) => {
     const chunks: Buffer[] = []
     for await (const chunk of request)
@@ -61,17 +81,43 @@ export async function createExplorerBrowserBackend(): Promise<ExplorerBrowserBac
     }
     response.setHeader('Content-Type', 'application/json')
     if (request.method !== 'GET') {
-      if (request.url !== '/odata/Products(0)' || !['PATCH', 'DELETE'].includes(request.method || '')) {
+      if (!mutationPaths.includes(request.url || '') || ![version === 'v2' ? 'MERGE' : 'PATCH', 'DELETE'].includes(request.method || '')) {
         response.statusCode = 405
         response.end(JSON.stringify({ error: { message: 'Unsupported fixture mutation target.' } }))
         return
       }
-      response.end(JSON.stringify({ ID: 0, Name: 'Synthetic write accepted' }))
+      const index = products.findIndex(record => String(record.ID) === '0')
+      if (index < 0) {
+        response.statusCode = 404
+        response.end(JSON.stringify({ error: { message: 'The fixture record no longer exists.' } }))
+        return
+      }
+      if (request.method === 'DELETE') {
+        products.splice(index, 1)
+        response.statusCode = 204
+        response.end()
+        return
+      }
+      try {
+        const payload: unknown = JSON.parse(Buffer.concat(chunks).toString())
+        if (payload === null || typeof payload !== 'object' || Array.isArray(payload)
+          || ('ID' in payload && String(payload.ID) !== '0')
+          || (options.compositeKey && 'Tenant' in payload && payload.Tenant !== 'O\'Brien/&?')) {
+          throw new Error('The fixture accepts partial record objects without key changes.')
+        }
+        products[index] = { ...products[index], ...payload }
+        response.end(JSON.stringify(products[index]))
+      }
+      catch {
+        response.statusCode = 400
+        response.end(JSON.stringify({ error: { message: 'Invalid fixture update payload.' } }))
+      }
       return
     }
-    response.end(JSON.stringify({ value: request.url?.includes('Suppliers')
+    const rows = request.url?.includes('Suppliers')
       ? [{ ID: 'S1', Name: 'Browser supplier' }]
-      : [{ ID: 0, Name: 'Zero desk' }, { ID: 1, Name: 'Desk' }, { Name: 'Unkeyed desk' }] }))
+      : products
+    response.end(JSON.stringify(version === 'v2' ? { d: { results: rows } } : { value: rows }))
   })
   const upstreamOrigin = await listen(upstream)
   const config = {
@@ -80,10 +126,14 @@ export async function createExplorerBrowserBackend(): Promise<ExplorerBrowserBac
     mode: 'sdk' as const,
     basePath: '/api/odx',
     devtools: { enabled: true },
-    services: [{ name: 'LocalCatalog', route: 'catalog', url: `${upstreamOrigin}/odata`, strategy: 'proxied' as const, proxyMode: 'buffer' as const }],
+    services: [
+      { name: 'LocalCatalog', route: 'catalog', url: `${upstreamOrigin}/odata`, strategy: 'proxied' as const, proxyMode: 'buffer' as const },
+      ...(options.secondService ? [{ name: 'OtherCatalog', route: 'other', url: `${upstreamOrigin}/odata`, strategy: 'proxied' as const, proxyMode: 'buffer' as const }] : []),
+    ],
   }
   const app = createApp()
   app.use(defineEventHandler((event) => {
+    gatewayRequests.push({ path: event.path, url: event.node.req.url })
     event.context.odataConfig = config
   }))
   app.use('/__odx__/config', configHandler)
@@ -98,8 +148,11 @@ export async function createExplorerBrowserBackend(): Promise<ExplorerBrowserBac
     serviceUrl: `${upstreamOrigin}/odata`,
     metadata: xml,
     requests,
+    gatewayRequests,
     async reset() {
       requests.splice(0)
+      gatewayRequests.splice(0)
+      products = initialProducts()
       await clearODataLogs()
     },
     async close() {

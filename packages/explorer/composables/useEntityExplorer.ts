@@ -1,9 +1,11 @@
 import type { EntityMapping } from '@me-tools/odx-core'
+import type { ExplorerMutationTarget } from '../utils/recordIdentity'
 import type { EditorState } from './useODataState'
-import { flattenOData } from '@me-tools/odx-core'
+import { flattenOData, validateODataIdentifier } from '@me-tools/odx-core'
 import { useNuxtApp } from 'nuxt/app'
-import { onScopeDispose } from 'vue'
+import { onScopeDispose, toRaw } from 'vue'
 import { createAppState } from '../utils/appState'
+import { resolveExplorerRecordIdentity } from '../utils/recordIdentity'
 import { buildEntityPreviewCacheKey, buildRuntimeProxyUrl } from './useODataState'
 
 const RE_TRAILING_SLASH = /\/$/
@@ -29,10 +31,11 @@ export interface EntityExplorer {
   previewColumns: ComputedRef<string[]>
   navigationItems: ComputedRef<any[]>
   refreshEntityData: () => Promise<void>
+  reloadEntityData: () => Promise<void>
   resetQuery: () => void
   isNavigationProperty: (key: string) => boolean
   openEditor: (mode: 'view' | 'create' | 'update' | 'headers', row?: any) => void
-  deleteItem: (id: any) => Promise<void>
+  deleteItem: (row: Record<string, unknown>) => Promise<void>
   downloadJson: () => void
 }
 
@@ -53,10 +56,11 @@ function createEntityExplorer(): EntityExplorer {
     selectedService,
     selectedEntity,
     config,
-    sessionHeaders,
+    getSessionHeaders,
     previewLoading,
     previewError,
     previewData,
+    previewOwner,
     queryInput,
     queryMethod,
     queryState,
@@ -225,7 +229,15 @@ function createEntityExplorer(): EntityExplorer {
     }
   })
 
-  async function refreshEntityData(): Promise<void> {
+  function refreshEntityData(): Promise<void> {
+    return executeEntityData(queryMethod.value)
+  }
+
+  function reloadEntityData(): Promise<void> {
+    return executeEntityData('GET')
+  }
+
+  async function executeEntityData(method: string): Promise<void> {
     if (!selectedService.value || !selectedEntity.value) {
       return
     }
@@ -234,7 +246,6 @@ function createEntityExplorer(): EntityExplorer {
     const entity = selectedEntity.value
     const svcName = service.name
     const query = queryInput.value
-    const method = queryMethod.value
     // Navigation can supersede reads; aborting a dispatched write cannot undo it.
     const request = method === 'GET' ? previewRequest.begin() : null
     const isCurrent = (): boolean => request ? request.isCurrent() : !disposed
@@ -270,9 +281,11 @@ function createEntityExplorer(): EntityExplorer {
         method,
         ...(request ? { signal: request.signal } : {}),
         headers: {
-          'Accept': 'application/json',
+          'Accept': entitySchema.value?.name === service.name && entitySchema.value.version === 'v4'
+            ? 'application/json;IEEE754Compatible=true'
+            : 'application/json',
           'Content-Type': 'application/json',
-          ...sessionHeaders.value,
+          ...getSessionHeaders(service.name),
         },
       })
       if (!isCurrent())
@@ -339,6 +352,7 @@ function createEntityExplorer(): EntityExplorer {
 
       const finalData = flattenOData(data)
       const dataArray = Array.isArray(finalData) ? finalData : (finalData ? [finalData] : [])
+      previewOwner.value = { serviceName: svcName, entitySet: entity }
       previewData.value = dataArray
 
       // Update cache
@@ -368,6 +382,7 @@ function createEntityExplorer(): EntityExplorer {
       }
       previewError.value = msg
       previewData.value = []
+      previewOwner.value = null
 
       // Cache the error state too
       entityDataCache.value[cacheKey] = {
@@ -417,15 +432,36 @@ function createEntityExplorer(): EntityExplorer {
     )
   }
 
+  function captureMutationTarget(mode: 'create' | 'update', row: unknown): ExplorerMutationTarget {
+    const service = selectedService.value
+    const entitySet = selectedEntity.value
+    if (!service || !entitySet)
+      throw new Error('The original service and entity are unavailable. No request was sent.')
+    validateODataIdentifier(entitySet, 'Explorer entity set')
+    if (mode === 'update' && (previewOwner.value?.serviceName !== service.name
+      || previewOwner.value.entitySet !== entitySet || !previewData.value?.some(record => toRaw(record) === toRaw(row)))) {
+      throw new Error('This record does not belong to the displayed service and entity. Reload data before editing. No request was sent.')
+    }
+    if (mode === 'update' && entitySchema.value?.name !== service.name)
+      throw new Error('Metadata for the original service is unavailable. No request was sent.')
+    const identity = mode === 'update' ? resolveExplorerRecordIdentity(entitySchema.value, entitySet, row) : undefined
+    const route = service.route || service.name.toLowerCase()
+    return Object.freeze({
+      serviceName: service.name,
+      entitySet,
+      url: buildRuntimeProxyUrl(`${config.value.basePath}/${route}/${identity?.entityPath ?? entitySet}`),
+      method: mode === 'create' ? 'POST' : identity?.version === 'v2' ? 'MERGE' : 'PATCH',
+      headers: Object.freeze({ ...getSessionHeaders(service.name) }),
+      ...(identity ? { key: identity.key } : {}),
+    })
+  }
+
   function openEditor(mode: 'view' | 'create' | 'update' | 'headers', row: any = null): void {
     let initialJson = ''
     if (mode === 'headers') {
-      const svcConfig = config.value.services?.find((s: any) => s.name === selectedService.value?.name)
-      const combinedHeaders = {
-        ...((svcConfig as any)?.headers || {}),
-        ...sessionHeaders.value,
-      }
-      initialJson = JSON.stringify(combinedHeaders, null, 2)
+      // Configured outbound headers stay server-owned; only edit this service's
+      // explicit browser-session overrides.
+      initialJson = JSON.stringify(selectedService.value ? getSessionHeaders(selectedService.value.name) : {}, null, 2)
     }
     else if (row) {
       initialJson = JSON.stringify(row, null, 2)
@@ -449,6 +485,16 @@ function createEntityExplorer(): EntityExplorer {
       initialJson = JSON.stringify({ ID: '', Name: '' }, null, 2)
     }
 
+    let target: ExplorerMutationTarget | undefined
+    let targetError: string | undefined
+    if (mode === 'create' || mode === 'update') {
+      try {
+        target = captureMutationTarget(mode, row)
+      }
+      catch (error) {
+        targetError = error instanceof Error ? error.message : 'The record identity is unavailable. No request was sent.'
+      }
+    }
     editor.value = {
       show: true,
       mode,
@@ -456,36 +502,33 @@ function createEntityExplorer(): EntityExplorer {
       loading: false,
       original: row,
       json: initialJson,
+      context: selectedEntity.value ?? undefined,
+      headersServiceName: mode === 'headers' ? selectedService.value?.name : undefined,
+      target,
+      targetError,
     }
   }
 
-  async function deleteItem(id: any): Promise<void> {
-    if (!selectedService.value || !selectedEntity.value
-      || (typeof id !== 'number' && typeof id !== 'string') || id === ''
-      || (typeof id === 'number' && !Number.isFinite(id))) {
-      return
-    }
-
-    // eslint-disable-next-line no-alert
-    if (!confirm(`Delete item ${id}?`)) {
-      return
-    }
+  async function deleteItem(row: Record<string, unknown>): Promise<void> {
     try {
-      const route = selectedService.value.route || selectedService.value.name.toLowerCase()
-      const encodedId = encodeURIComponent(String(id))
-      const res = await fetch(buildRuntimeProxyUrl(`${config.value.basePath}/${route}/${selectedEntity.value}?id=${encodedId}`), {
+      const target = captureMutationTarget('update', row)
+      // eslint-disable-next-line no-alert
+      if (!confirm(`Delete this record from ${target.entitySet}?`))
+        return
+      const res = await fetch(target.url, {
         method: 'DELETE',
-        headers: { ...sessionHeaders.value },
+        headers: target.headers,
       })
       if (!res.ok)
         throw new Error(`Delete failed (${res.status} ${res.statusText || ''}).`.trim())
       if (res.ok) {
         toast.add({
-          title: `Item ${id} deleted successfully`,
+          title: `Record deleted from ${target.entitySet}`,
           icon: 'i-lucide-circle-check',
           color: 'success',
         })
-        await refreshEntityData()
+        if (selectedService.value?.name === target.serviceName && selectedEntity.value === target.entitySet)
+          await reloadEntityData()
       }
     }
     catch (e: unknown) {
@@ -542,6 +585,7 @@ function createEntityExplorer(): EntityExplorer {
     previewColumns,
     navigationItems,
     refreshEntityData,
+    reloadEntityData,
     resetQuery,
     isNavigationProperty,
     openEditor,

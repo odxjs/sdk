@@ -1,21 +1,26 @@
 <script setup lang="ts">
 import type { EditorState } from '../composables/useODataState'
-import { computed, watch } from 'vue'
-import { buildRuntimeProxyUrl, useSharedODataState } from '../composables/useODataState'
+import { computed, onScopeDispose, watch } from 'vue'
+import { useSharedODataState } from '../composables/useODataState'
+import { assertExplorerKeyUnchanged } from '../utils/recordIdentity'
 
 const emit = defineEmits(['refresh'])
 const editor = defineModel<EditorState>('editor', { required: true })
-const { selectedService, selectedEntity, config, sessionHeaders } = useSharedODataState()
+const { selectedService, selectedEntity, setSessionHeaders } = useSharedODataState()
 const toast = useToast()
 
 let validationTimeout: ReturnType<typeof setTimeout> | null = null
+onScopeDispose(() => {
+  if (validationTimeout)
+    clearTimeout(validationTimeout)
+})
 
 const modeConfig = computed(() => {
   switch (editor.value.mode) {
     case 'create':
       return { title: 'Create Record', icon: 'i-lucide-plus', method: 'POST' }
     case 'update':
-      return { title: 'Edit Record', icon: 'i-lucide-pencil', method: 'PATCH' }
+      return { title: 'Edit Record', icon: 'i-lucide-pencil', method: editor.value.target?.method ?? 'UPDATE' }
     case 'headers':
       return { title: 'Session Headers', icon: 'i-lucide-sliders-horizontal', method: 'CONFIG' }
     case 'response':
@@ -46,15 +51,16 @@ function formatJsonError(err: Error): string {
 watch(
   () => editor.value.json,
   (newVal) => {
-    if (editor.value.mode === 'response')
-      return
-    if (editor.value.mode === 'view') {
-      editor.value.error = null
-      return
-    }
-
     if (validationTimeout) {
       clearTimeout(validationTimeout)
+      validationTimeout = null
+    }
+    const draft = editor.value
+    if (draft.mode === 'response')
+      return
+    if (draft.mode === 'view') {
+      draft.error = null
+      return
     }
 
     if (!newVal || newVal.trim() === '') {
@@ -68,7 +74,8 @@ watch(
     }
     catch (e: unknown) {
       validationTimeout = setTimeout(() => {
-        editor.value.error = formatJsonError(e as Error)
+        if (editor.value === draft && draft.json === newVal)
+          draft.error = formatJsonError(e as Error)
       }, 800)
     }
   },
@@ -80,41 +87,45 @@ watch(
  * Executes the respective HTTP method based on the editor mode.
  */
 async function saveItem() {
-  if (editor.value.mode !== 'headers' && (!selectedService.value || !selectedEntity.value)) {
-    return
-  }
-
-  editor.value.loading = true
-  editor.value.error = null
+  const draft = editor.value
+  draft.loading = true
+  draft.error = null
 
   try {
-    const payload = JSON.parse(editor.value.json)
+    const payload = JSON.parse(draft.json)
+    if (payload === null || typeof payload !== 'object' || Array.isArray(payload))
+      throw new Error('Payload must be a JSON object. No request was sent.')
 
-    if (editor.value.mode === 'headers') {
-      sessionHeaders.value = payload
+    if (draft.mode === 'headers') {
+      if (Object.values(payload).some(value => typeof value !== 'string'))
+        throw new Error('Session header values must be strings.')
+      if (!draft.headersServiceName)
+        throw new Error('The original service is unavailable. No session headers were changed.')
+      setSessionHeaders(draft.headersServiceName, payload)
       toast.add({
         title: 'Session headers updated',
         icon: 'i-lucide-settings',
         color: 'success',
       })
-      editor.value.show = false
-      editor.value.loading = false
-      emit('refresh')
+      draft.show = false
+      if (selectedService.value?.name === draft.headersServiceName)
+        emit('refresh')
       return
     }
 
-    const route = selectedService.value!.route || selectedService.value!.name.toLowerCase()
-    const idKey = editor.value.original ? Object.keys(editor.value.original).find(k => k.toLowerCase() === 'id') : null
-    const id = idKey ? (editor.value.original as Record<string, unknown>)[idKey] : null
-    const updating = editor.value.mode === 'update'
-    if (updating && ((typeof id !== 'number' && typeof id !== 'string')
-      || id === '' || (typeof id === 'number' && !Number.isFinite(id)))) {
-      throw new Error('Cannot update this record without a supported ID. No request was sent.')
-    }
-
-    const res = await fetch(buildRuntimeProxyUrl(`${config.value.basePath}/${route}/${selectedEntity.value}${updating ? `?id=${encodeURIComponent(String(id))}` : ''}`), {
-      method: updating ? 'PATCH' : 'POST',
-      headers: { 'Content-Type': 'application/json', ...sessionHeaders.value },
+    if (draft.mode !== 'create' && draft.mode !== 'update')
+      throw new Error('This editor does not send record mutations.')
+    const target = draft.target
+    if (!target)
+      throw new Error(draft.targetError || 'The original mutation target is unavailable. No request was sent.')
+    const updating = draft.mode === 'update'
+    if ((updating && target.method === 'POST') || (!updating && target.method !== 'POST'))
+      throw new Error('The captured operation does not match this editor. No request was sent.')
+    if (updating && target.key)
+      assertExplorerKeyUnchanged(target.key, payload)
+    const res = await fetch(target.url, {
+      method: target.method,
+      headers: { 'Content-Type': 'application/json', ...target.headers },
       body: JSON.stringify(payload),
     })
 
@@ -139,18 +150,28 @@ async function saveItem() {
       color: 'success',
     })
 
-    editor.value.show = false
-    editor.value.loading = false
-    emit('refresh')
+    draft.show = false
+    if (selectedService.value?.name === target.serviceName && selectedEntity.value === target.entitySet)
+      emit('refresh')
   }
   catch (e: unknown) {
     if (e instanceof SyntaxError) {
-      editor.value.error = formatJsonError(e)
+      draft.error = formatJsonError(e)
     }
     else {
-      editor.value.error = (e as Error).message
+      draft.error = e instanceof Error ? e.message : String(e)
     }
-    editor.value.loading = false
+    if (editor.value !== draft || !draft.show) {
+      toast.add({
+        title: `Request failed: ${draft.target?.serviceName ?? draft.headersServiceName ?? ''}/${draft.context ?? ''}`,
+        description: draft.error,
+        icon: 'i-lucide-circle-x',
+        color: 'error',
+      })
+    }
+  }
+  finally {
+    draft.loading = false
   }
 }
 

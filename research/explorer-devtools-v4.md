@@ -8,6 +8,40 @@ synthetic project source.
 
 ## Implementation progress
 
+### D1: metadata-owned record mutations
+
+The editor now captures the original service, entity, typed key, method and
+service-specific session headers. Core builders own literal formatting and
+escaping; updates use V2 MERGE or V4 PATCH. A displayed row must belong to the
+current preview and metadata before it can be edited or deleted. Missing keys,
+changed key values and already rounded large numeric keys fail closed. Partial
+updates may omit unchanged keys. A late write result cannot replace a later
+editor, and failures remain visible after the first editor was closed.
+
+Opus identified that post-write refresh previously reused the raw method
+selector: a refresh could therefore dispatch a second, bodyless mutation.
+Automatic editor reload now has its own GET entrypoint. Session overrides are
+kept per service, with the header editor retaining its original service owner;
+server-configured outbound headers are no longer copied into that editor.
+
+The real V2/V4 composite browser contract also exposed a proxy bug below the
+Explorer: H3 decodes `%26` and `%3F` in `event.path` before route dispatch. Parsing
+that path broke opaque keys at their apparent query boundary. Commit `2427b9f`
+uses the original mount-relative Node request URL while retaining the existing
+resource-path validator. The real HTTP probe now reaches and updates the
+synthetic backend. All 200 focused URL/proxy/target/policy cases pass, including
+dispatch through a parent H3 mount. The Explorer state/identity suite passes
+71 cases. All 14 freshly built production Chromium journeys passed, including
+V2/V4 composite edit/delete, actual header isolation across service navigation,
+key-change rejection and partial updates, and late success/conflict while a
+newer editor stays intact. The subsequent fractional-Decimal guard and V4
+IEEE754 Accept negotiation are covered by the final focused unit run; the
+browser fixture itself exercises integer/string keys. Explorer typecheck and
+changed-file lint passed. Entity ETags and conflict-specific recovery follow
+as D2.
+
+### Earlier baseline and native integration
+
 The executable baseline/controller work is implemented in local commits
 `e59c959`, `f0f5f77`, `586080b`, `cb0bebd`, `e63b9dd` and `e6dc130`:
 

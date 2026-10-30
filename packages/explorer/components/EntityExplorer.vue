@@ -6,7 +6,7 @@ import EntityOfflineState from './entity/OfflineState.vue'
 import EntityTable from './entity/Table.vue'
 import EntityToolbar from './entity/Toolbar.vue'
 
-const { selectedEntity, editor, refreshEntityData, selectedService } = useEntityExplorer()
+const { selectedEntity, editor, reloadEntityData, selectedService } = useEntityExplorer()
 </script>
 
 <template>
@@ -35,7 +35,7 @@ const { selectedEntity, editor, refreshEntityData, selectedService } = useEntity
 
     <DataEditor
       v-model:editor="editor"
-      @refresh="refreshEntityData"
+      @refresh="reloadEntityData"
     />
   </div>
 </template>

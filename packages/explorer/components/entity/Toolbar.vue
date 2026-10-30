@@ -22,6 +22,7 @@ const showBuilder = ref(false)
     <div class="p-4 border-b border-default/50 flex items-center gap-4 bg-transparent backdrop-blur-md rounded-t-[inherit]">
       <USelect
         v-model="queryMethod"
+        aria-label="Request method"
         :items="methods"
         class="font-mono min-w-24"
         size="md"

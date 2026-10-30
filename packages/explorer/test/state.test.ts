@@ -35,6 +35,7 @@ describe('explorer State Composable', () => {
       logSearch,
       logs,
       previewData,
+      previewOwner,
       previewError,
       previewLoading,
       queryInput,
@@ -43,7 +44,7 @@ describe('explorer State Composable', () => {
       selectedEntity,
       selectedService,
       selectedTraceLogId,
-      sessionHeaders,
+      clearSessionHeaders,
       useCORSBridge,
       entityDataCache,
       entitySchema,
@@ -67,6 +68,7 @@ describe('explorer State Composable', () => {
     previewLoading.value = false
     previewError.value = null
     previewData.value = null
+    previewOwner.value = null
     queryInput.value = '?'
     queryMethod.value = 'GET'
     queryState.value = {
@@ -84,7 +86,7 @@ describe('explorer State Composable', () => {
     entitySchema.value = null
     entitySchemaLoading.value = false
     entityDataCache.value = {}
-    sessionHeaders.value = {}
+    clearSessionHeaders()
     useCORSBridge.value = true
     expect(filteredLogs.value).toEqual([])
     expect(hasActiveLogFilters.value).toBe(false)
@@ -1222,12 +1224,102 @@ describe('explorer State Composable', () => {
     })
   })
 
+  it('keeps session overrides service-owned and excludes configured outbound headers from the editor', async () => {
+    const state = useSharedODataState()
+    const service = { name: 'Northwind', headers: { 'X-Server-Only': 'synthetic-private' }, entities: [{ name: 'Products' }] }
+    state.config.value = { basePath: '/api/odx', services: [service, { name: 'Other' }] }
+    state.selectedService.value = service as any
+    state.selectedEntity.value = 'Products'
+    const explorer = createEntityExplorer()
+    state.sessionHeaders.value = { 'sap-client': '100' }
+    explorer.openEditor('headers')
+    expect(explorer.editor.value.headersServiceName).toBe('Northwind')
+    expect(JSON.parse(explorer.editor.value.json)).toEqual({ 'sap-client': '100' })
+    state.selectedService.value = { name: 'Other' } as any
+    expect(state.sessionHeaders.value).toEqual({})
+    state.setSessionHeaders('Northwind', { 'sap-client': '200' })
+    expect(state.sessionHeaders.value).toEqual({})
+    state.sessionHeaders.value = { 'sap-client': '300' }
+    state.selectedService.value = service as any
+    expect(state.sessionHeaders.value).toEqual({ 'sap-client': '200' })
+    state.clearSessionHeaders()
+    expect(state.getSessionHeaders('Other')).toEqual({})
+  })
+
+  it('requests exact IEEE754 JSON values for reads with owned V4 metadata', async () => {
+    const state = useSharedODataState()
+    const service = { name: 'Northwind', route: 'northwind', entities: [{ name: 'Products' }] }
+    state.config.value = { basePath: '/api/odx', services: [service] }
+    state.selectedService.value = service as any
+    state.selectedEntity.value = 'Products'
+    const explorer = createEntityExplorer()
+    await nextTick()
+    await nextTick()
+    state.entitySchema.value = { name: 'Northwind', version: 'v4', entities: [] }
+    await explorer.reloadEntityData()
+    expect(vi.mocked(fetch).mock.calls.at(-1)?.[1]?.headers).toMatchObject({ Accept: 'application/json;IEEE754Compatible=true' })
+  })
+
+  it('captures the original editor target, method and headers before selection changes', async () => {
+    const state = useSharedODataState()
+    const service = { name: 'Northwind', route: 'northwind', entities: [{ name: 'Products' }] }
+    state.config.value = { basePath: '/api/odx', services: [service] }
+    state.selectedService.value = service as any
+    state.selectedEntity.value = 'Products'
+    const explorer = createEntityExplorer()
+    await nextTick()
+    await nextTick()
+    state.entitySchema.value = { name: 'Northwind', version: 'v2', entities: [{ name: 'Products', properties: [{ name: 'Code', type: 'Edm.String', isKey: true }] }] }
+    state.sessionHeaders.value = { 'X-Test-Session': 'original' }
+    const row = { Code: 'A/B', ID: 999 }
+    state.previewData.value = [row]
+    state.previewOwner.value = { serviceName: 'Northwind', entitySet: 'Products' }
+    explorer.openEditor('update', row)
+    const target = explorer.editor.value.target
+    row.Code = 'changed'
+    state.selectedService.value = { name: 'Other', route: 'other' } as any
+    state.selectedEntity.value = 'Suppliers'
+    state.sessionHeaders.value = { 'X-Test-Session': 'replacement' }
+    expect(target, explorer.editor.value.targetError).toEqual({
+      serviceName: 'Northwind',
+      entitySet: 'Products',
+      url: '/api/odx/northwind/Products(\'A%2FB\')',
+      method: 'MERGE',
+      headers: { 'X-Test-Session': 'original' },
+      key: { 'version': 'v2', '@odata.key': [{ field: 'Code', type: 'Edm.String', value: 'A/B' }] },
+    })
+    expect(Object.isFrozen(target)).toBe(true)
+    expect(Object.isFrozen(target?.headers)).toBe(true)
+  })
+
+  it('rejects a previous entity row before the selection watcher has flushed', async () => {
+    const state = useSharedODataState()
+    const service = { name: 'Northwind', route: 'northwind', entities: [{ name: 'Products' }, { name: 'Suppliers' }] }
+    state.config.value = { basePath: '/api/odx', services: [service] }
+    state.selectedService.value = service as any
+    state.selectedEntity.value = 'Products'
+    const explorer = createEntityExplorer()
+    await nextTick()
+    await nextTick()
+    const properties = [{ name: 'ID', type: 'Edm.Int32', isKey: true }]
+    state.entitySchema.value = { name: 'Northwind', version: 'v4', entities: [{ name: 'Products', properties }, { name: 'Suppliers', properties }] }
+    const row = { ID: 0 }
+    state.previewData.value = [row]
+    state.previewOwner.value = { serviceName: 'Northwind', entitySet: 'Products' }
+    state.selectedEntity.value = 'Suppliers'
+    explorer.openEditor('update', row)
+    expect(explorer.editor.value.target).toBeUndefined()
+    expect(explorer.editor.value.targetError).toContain('does not belong to the displayed service and entity')
+    expect(vi.mocked(fetch).mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true)
+  })
+
   it.each([
-    { id: 'A/B?x=1&R #2', encoded: 'A%2FB%3Fx%3D1%26R%20%232' },
-    { id: 0, encoded: '0' },
-  ])('encodes delete item ID $id while preserving delete success behavior', async ({ id, encoded }) => {
+    { id: 'A/B?x=1&R #2', type: 'Edm.String', path: 'Products(\'A%2FB%3Fx%3D1%26R%20%232\')' },
+    { id: 0, type: 'Edm.Int32', path: 'Products(0)' },
+  ])('uses the declared delete key $id while preserving delete success behavior', async ({ id, type, path }) => {
     vi.stubGlobal('confirm', vi.fn(() => true))
-    const { config, previewData, selectedEntity, selectedService } = useSharedODataState()
+    const { config, previewData, previewOwner, queryMethod, selectedEntity, selectedService, entitySchema } = useSharedODataState()
+    const metadata = { name: 'Northwind', version: 'v4', entities: [{ name: 'Products', properties: [{ name: 'ProductCode', type, isKey: true }] }] }
     config.value = {
       basePath: '/api/odx',
       services: [
@@ -1246,11 +1338,16 @@ describe('explorer State Composable', () => {
     } as any
     ;(globalThis.fetch as any).mockResolvedValue({
       ok: true,
-      json: async () => ({ entities: [] }),
+      json: async () => metadata,
     })
     selectedEntity.value = 'Products'
     await nextTick()
     await nextTick()
+    entitySchema.value = metadata
+    const row = { ProductCode: id, ID: 999 }
+    previewData.value = [row]
+    previewOwner.value = { serviceName: 'Northwind', entitySet: 'Products' }
+    queryMethod.value = 'DELETE'
 
     ;(globalThis.fetch as any).mockClear()
     ;(globalThis.fetch as any)
@@ -1262,16 +1359,16 @@ describe('explorer State Composable', () => {
 
     const { deleteItem } = createEntityExplorer()
     const nuxtApp = useNuxtApp()
-    await nuxtApp.runWithContext(() => deleteItem(id))
+    await nuxtApp.runWithContext(() => deleteItem(row))
     await nextTick()
 
     expect(globalThis.fetch).toHaveBeenNthCalledWith(
       1,
-      `/api/odx/northwind-api/Products?id=${encoded}`,
+      `/api/odx/northwind-api/${path}`,
       { method: 'DELETE', headers: {} },
     )
     expect(nuxtApp.payload.state.$stoasts).toEqual(expect.arrayContaining([expect.objectContaining({
-      title: `Item ${id} deleted successfully`,
+      title: 'Record deleted from Products',
       icon: 'i-lucide-circle-check',
       color: 'success',
     })]))
@@ -1279,28 +1376,33 @@ describe('explorer State Composable', () => {
       method: 'GET',
       signal: expect.any(AbortSignal),
       headers: {
-        'Accept': 'application/json',
+        'Accept': 'application/json;IEEE754Compatible=true',
         'Content-Type': 'application/json',
       },
     })
     expect(previewData.value).toEqual([{ ID: 'refreshed' }])
+    expect(queryMethod.value).toBe('DELETE')
   })
 
   it('reports failed deletes without refreshing or claiming success', async () => {
     vi.stubGlobal('confirm', vi.fn(() => true))
-    const { config, selectedEntity, selectedService, sessionHeaders } = useSharedODataState()
+    const { config, selectedEntity, selectedService, sessionHeaders, entitySchema, previewData, previewOwner } = useSharedODataState()
     const service = { name: 'Northwind', route: 'northwind', entities: [{ name: 'Products' }] }
     config.value = { basePath: '/api/odx', services: [service] }
     selectedService.value = service as any
     selectedEntity.value = 'Products'
     await nextTick()
     await nextTick()
+    entitySchema.value = { name: 'Northwind', version: 'v4', entities: [{ name: 'Products', properties: [{ name: 'ID', type: 'Edm.Int32', isKey: true }] }] }
+    const row = { ID: 0 }
+    previewData.value = [row]
+    previewOwner.value = { serviceName: 'Northwind', entitySet: 'Products' }
     sessionHeaders.value = { 'X-Test-Session': 'synthetic' }
     vi.mocked(globalThis.fetch).mockClear()
     vi.mocked(globalThis.fetch).mockResolvedValue(new Response('', { status: 412, statusText: 'Precondition Failed' }))
-    await createEntityExplorer().deleteItem(0)
+    await createEntityExplorer().deleteItem(row)
     await nextTick()
-    expect(globalThis.fetch).toHaveBeenCalledExactlyOnceWith('/api/odx/northwind/Products?id=0', {
+    expect(globalThis.fetch).toHaveBeenCalledExactlyOnceWith('/api/odx/northwind/Products(0)', {
       method: 'DELETE',
       headers: { 'X-Test-Session': 'synthetic' },
     })

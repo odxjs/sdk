@@ -80,13 +80,24 @@ frames retain browser isolation and only use document visibility.
 
 ## Record editing
 
-The editor's selected operation determines whether it creates or updates a
-record. An update without a supported single ID reports an error and sends no
-request; it cannot fall back to creating a record. Numeric ID `0` is supported,
-IDs are URL-encoded, and session headers apply to updates and deletion as well
-as reads. Failed deletion reports an error instead of claiming success.
-This path still uses the proxy's existing single-ID compatibility rewrite;
-metadata-derived composite keys and entity ETags are separate migration work.
+The editor captures the original service, entity set, metadata-owned typed key,
+method and session headers when it opens. Single and composite keys use core
+OData builders, including differently named keys, numeric zero, escaped strings
+and V2/V4 literals. V2 updates use MERGE and V4 updates use PATCH. Missing,
+ambiguous or unsafe numeric identities block a write; updates never become
+creates. Large Int64/Decimal keys must arrive as exact strings rather than
+rounded JavaScript numbers; reads with known V4 metadata request
+`IEEE754Compatible=true`. Fractional Decimal keys also require exact strings.
+Partial updates may omit keys, but cannot change
+the captured identity.
+
+Session header overrides belong to their selected service and apply to reads,
+updates and deletes. Configured server outbound headers are not copied into
+the browser's editable override set. Closing an editor does not cancel an
+already dispatched write: its outcome remains visible without closing or
+overwriting a newer editor. Automatic reloads always use GET, independently of
+the raw request selector. Deletion failures report an error instead of claiming
+success. Entity ETags and conflict-specific recovery remain migration work.
 
 For documentation on the DevTools UI and debugging patterns, see the root
 documentation in this repository.
