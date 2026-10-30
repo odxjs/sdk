@@ -62,6 +62,7 @@
     "test:live:northwind": "vitest run --config vitest.live.config.ts",
     "test:explorer-consumer": "tsx test/verify-explorer-consumer.mts",
     "test:explorer-native": "tsx test/verify-explorer-native.mts",
+    "test:explorer-startup": "tsx test/verify-explorer-startup.mts",
     "verify": "vitest run && pnpm run playground:check",
     "build": "nuxt-module-build build",
     "typecheck": "tsc --noEmit -p tsconfig.json",

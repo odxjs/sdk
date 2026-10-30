@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
-import { computed, ref } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { buildSchemaEndpointUrl, supportsSdkGeneration, useSharedODataState } from '../../composables/useODataState'
 import EntityExplorer from '../EntityExplorer.vue'
-import SchemaExplorer from '../SchemaExplorer.vue'
+import SchemaLoading from '../SchemaLoading.vue'
+import SchemaUnavailable from '../SchemaUnavailable.vue'
 import ServiceSettings from '../ServiceSettings.vue'
 
 const RE_TRAILING_SLASH = /\/$/
@@ -21,6 +22,19 @@ const {
   logFilterService,
 } = useSharedODataState()
 const toast = useToast()
+const schemaRequested = ref(false)
+const SchemaExplorer = defineAsyncComponent({
+  loader: () => import('../SchemaExplorer.vue'),
+  loadingComponent: SchemaLoading,
+  errorComponent: SchemaUnavailable,
+  delay: 0,
+})
+watch([globalViewMode, () => selectedService.value?.name], ([mode, name]) => {
+  if (!name)
+    schemaRequested.value = false
+  else if (mode === 'schema')
+    schemaRequested.value = true
+}, { immediate: true })
 
 function viewLogs(service: any) {
   logFilterService.value = service.name.toLowerCase()
@@ -360,7 +374,7 @@ const actionItems = computed((): DropdownMenuItem[][] => {
 
       <div class="flex-1 overflow-hidden relative">
         <EntityExplorer v-show="globalViewMode === 'explorer'" />
-        <SchemaExplorer v-show="globalViewMode === 'schema'" />
+        <SchemaExplorer v-if="schemaRequested" v-show="globalViewMode === 'schema'" />
       </div>
 
       <ServiceSettings v-model:open="showSettings" />

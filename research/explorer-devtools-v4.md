@@ -1,10 +1,12 @@
 # ODX Explorer: current audit and DevTools v4 migration plan
 
 Recorded 2026-10-30. Baseline: ODX `main` at `9f8940a`.
-The audit below records that original revision. Implementation is now in
-progress; the v4 migration and release acceptance are not complete. The audit
-and subsequent implementation reviews use Claude Opus 5.5 with selected
-synthetic project source.
+The audit below records that original revision. The bounded baseline,
+static-client delivery, native v4 integration, safe request workbench and
+initial startup/embedded-UX slices are implemented on
+`codex/odx-explorer-devtools-v4`. Release acceptance remains separate. The audit
+and implementation reviews use Claude Opus 5.5 with selected synthetic project
+source.
 
 ## Implementation progress
 
@@ -143,6 +145,71 @@ actual refreshed XML document that adds UpdatedField followed by a throwing
 generator: the UI shows the new table column, updated graph and partial-failure
 notification. A later assertion waits for the graph's final painted opacity;
 the final UX gate will also recapture that evidence after optional graph work.
+
+### E2: optional graph, focused JSON rendering and clean distribution
+
+The static-client baseline exposed 313 distinct JavaScript assets (12,085,097
+decoded bytes) before Schema was opened. Shiki's full entry registered lazy
+chunks for every language/theme, and Nuxt's SPA entry prefetched them. The
+editor now uses the [fine-grained public Shiki exports](https://shiki.style/guide/bundles)
+for JSON and its two existing GitHub themes, with the
+[JavaScript regex engine](https://shiki.style/guide/best-performance).
+Tests compare exact token HTML with the previous highlighter for valid,
+invalid, Unicode and hostile JSON in both themes. Per-editor disposal also
+handles initialization finishing after unmount.
+
+The graph mounts on first Schema intent, with an immediate loading state and a
+recoverable chunk-error state. Reload Explorer explicitly replaces the tool
+document, clearing a failed module-map entry while preserving the host business
+application. A real Chromium journey aborts the import once, verifies Data is
+still usable, reloads and paints the graph. The component is retained after
+first use to preserve viewport state; Nuxt may prefetch its code earlier.
+
+The same runner/lock/Chromium and three fresh contexts per version measure
+313 → 15 distinct JS assets, 12,085,097 → 2,743,964 decoded JS bytes before
+Schema, hidden graph nodes 2 → 0, and pre-Schema metadata reads 3 → 2. Asset
+responses are deduplicated by URL. Playwright routing disables HTTP cache;
+wire compression and interactivity speedups are not claimed. In particular,
+`dataReadyMs` includes a `networkidle` gate. Opus correctly identified that
+confounder, so the report uses asset footprint and avoided work as the evidence.
+
+Build inspection also found 653 files / 41,234,794 bytes in the prior shared
+output, including obsolete hashed chunks. Static builds now own fresh temporary
+Nuxt and Nitro directories, validate the generated client and remove only
+their allocated temporary build. Existing dev/test outputs are preserved.
+Two independent clean builds contain 21 files / 2,977,110 bytes each, with
+matching source/lock fingerprints and no obsolete language chunk. The root
+deployment build explicitly runs the standalone `nuxi build`, rather than
+expecting a temporary static build to leave `.output/server` behind. That local
+server build passes; no MTA archive or deployment was performed.
+
+The final Opus review also identified a Windows directory-lock failure: deleting
+the old client before renaming the new one could leave neither. Replacement now
+moves the recognized previous client to an allocated backup, restores it if
+placement fails, and preserves the backup with an actionable error if rollback
+is also blocked. Four real temporary-filesystem tests inject rename failures
+and verify preserved contents. Ownership is checked by manifest format/package,
+so a legitimate base-URL change is not mistaken for a foreign directory.
+
+Executed: exact-highlighter and graph-lifetime tests, root/Explorer/startup-runner
+typechecks, all 25 production Chromium journeys, 279 combined affected
+regressions and four client-replacement filesystem cases pass. Failed
+import/reload and partial-generation evidence uses actual painted graph states.
+The final static build, three-context startup profile, freshly installed tarball
+consumer and native authorization/data/schema/log/proxy/HMR/terminate/relaunch
+journey pass, with matching client source/build fingerprints. Hidden native
+docks issue zero log requests over two polling intervals. The installed host
+also proves production exclusion of Explorer assets while business OData works.
+
+Receipts are in `.artifacts/explorer-baseline-2026-10-30/`: `closing-checks.json`,
+`e2-startup-closing/receipt.json`, `installed-consumer-closing/receipt.json`,
+`native-verified/receipt.json`, `e2-browser.json`, `final-regressions.json` and
+`client-replacement-final.json`. The HTML report includes the previous profiles
+and Opus reviews. A prior Chromium `ERR_NO_BUFFER_SPACE` module-import failure
+remains documented, not claimed fixed; subsequent application runs passed.
+The diagnostic runner associates failed requests with their iframe instance,
+so terminating retained old frames cannot falsely fail a new client's startup.
+Root full verify, real SAP/BTP acceptance and publishing were not performed.
 
 ### Earlier baseline and native integration
 

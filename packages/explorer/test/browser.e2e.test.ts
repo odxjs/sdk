@@ -68,6 +68,7 @@ describe('explorer real browser usage', async () => {
   it.each(['pointer', 'keyboard'] as const)('opens a service with %s and keeps data, schema, logs and proxy usable', async (activation) => {
     const { context, page, errors } = await openExplorer(activation)
     try {
+      expect(await page.locator('.vue-flow__node').count()).toBe(0)
       await page.getByRole('tab', { name: 'Schema', exact: true }).click()
       await expect.poll(() => page.locator('.vue-flow__node').count()).toBe(2)
       await expect.poll(() => page.locator('.vue-flow__node').first().evaluate(element =>
@@ -92,6 +93,45 @@ describe('explorer real browser usage', async () => {
         await mkdir(directory, { recursive: true })
         await page.screenshot({ path: `${directory}/${activation}-proxy.png` })
       }
+    }
+    finally {
+      await page.unrouteAll({ behavior: 'wait' })
+      await context.close()
+    }
+  })
+
+  it('recovers a failed optional Schema chunk through an explicit Explorer reload', async () => {
+    const { context, page, errors } = await openExplorer('pointer')
+    let failedChunk: string | undefined
+    try {
+      await page.waitForLoadState('networkidle')
+      await page.route('**/*.js', async (route) => {
+        if (!failedChunk && route.request().resourceType() === 'script') {
+          failedChunk = route.request().url()
+          await route.abort('failed')
+        }
+        else {
+          await route.fallback()
+        }
+      })
+      await page.getByRole('tab', { name: 'Schema', exact: true }).click()
+      await expect.poll(() => page.getByRole('alert').filter({ hasText: 'Schema could not be loaded' }).isVisible()).toBe(true)
+      expect(failedChunk).toBeDefined()
+      await page.getByRole('tab', { name: 'Data', exact: true }).click()
+      expect(await page.getByRole('row').filter({ hasText: 'Zero desk' }).isVisible()).toBe(true)
+      await page.getByRole('tab', { name: 'Schema', exact: true }).click()
+      await Promise.all([
+        page.waitForEvent('domcontentloaded'),
+        page.getByRole('button', { name: 'Reload Explorer', exact: true }).click(),
+      ])
+      await page.getByRole('button', { name: 'Services', exact: true }).click()
+      await page.getByRole('link', { name: 'LocalCatalog', exact: true }).press('Enter')
+      await page.getByText('Products', { exact: true }).filter({ visible: true }).first().click()
+      await page.getByRole('tab', { name: 'Schema', exact: true }).click()
+      await expect.poll(() => page.locator('.vue-flow__node').count()).toBe(2)
+      await expect.poll(() => page.locator('.vue-flow').evaluate(element => getComputedStyle(element.parentElement!).opacity)).toBe('1')
+      // Only the deliberately aborted import may fail in this journey.
+      expect(errors.filter(error => !error.includes('net::ERR_FAILED') && !error.includes(failedChunk!))).toEqual([])
     }
     finally {
       await page.unrouteAll({ behavior: 'wait' })

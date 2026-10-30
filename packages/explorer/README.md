@@ -157,5 +157,36 @@ predict dynamic scopes, attributes and hooks. Independent layer hosts without
 a method projection retain the previous behavior; malformed explicit lists
 fail closed. The direct bridge retains its documented policy boundaries.
 
+## Optional schema and JSON rendering
+
+The graph mounts on the first Schema selection and retains its viewport while
+switching back to Data. It does not create hidden graph nodes or request graph
+metadata before that first selection. Nuxt may prefetch the async chunk earlier.
+A failed chunk load shows an explicit error; **Reload Explorer** refreshes the
+tool document and its module map without navigating the business application.
+
+The JSON editor bundles only its JSON grammar and GitHub light/dark themes.
+Its highlighter belongs to the rendered editor and is disposed on unmount,
+including initialization that finishes after the editor has closed.
+
+Static builds use isolated temporary Nuxt/Nitro directories so old hashed files
+from development or browser checks cannot accumulate in the distributed client.
+The separate root deployment build uses `nuxi build` to emit the standalone
+server runtime; see `DEPLOYMENT.md`.
+
+To profile an already-built static client with three fresh Chromium contexts:
+
+```sh
+pnpm --filter @me-tools/odx-nuxt test:explorer-startup
+```
+
+The default verifies current source/lock/manifest identity. For an intentionally
+older built baseline, pass an output directory followed by
+`--record-built-baseline`; this records the mismatch and still verifies every
+built file. Receipts retain the runner, manifest and response asset inventory.
+Count distinct URLs for asset footprint. Routing disables HTTP cache, and the
+recorded journey includes `networkidle`; these figures do not measure wire
+compression or first interactivity.
+
 For documentation on the DevTools UI and debugging patterns, see the root
 documentation in this repository.

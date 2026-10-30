@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { createHighlighter } from 'shiki'
-import { nextTick, onMounted, ref, watch } from 'vue'
+import type { HighlighterCore } from 'shiki/core'
+import { nextTick, onMounted, onScopeDispose, ref, watch } from 'vue'
+import { createExplorerJSONHighlighter } from '../utils/jsonHighlighter'
 
 const props = defineProps<{
   modelValue: string
@@ -16,19 +17,28 @@ const highlightedHtml = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const highlightRef = ref<HTMLDivElement | null>(null)
 const isReady = ref(false)
-let highlighter: any = null
+let highlighter: HighlighterCore | null = null
+let disposed = false
+onScopeDispose(() => {
+  disposed = true
+  highlighter?.dispose()
+  highlighter = null
+})
 
 async function initShiki() {
   try {
-    highlighter = await createHighlighter({
-      themes: ['github-light', 'github-dark'],
-      langs: ['json'],
-    })
+    const created = await createExplorerJSONHighlighter()
+    if (disposed) {
+      created.dispose()
+      return
+    }
+    highlighter = created
     isReady.value = true
     renderCode()
   }
   catch (e) {
-    console.error('[ShikiEditor] Failed to load highlighter:', e)
+    if (!disposed)
+      console.error('[ShikiEditor] Failed to load highlighter:', e)
   }
 }
 
