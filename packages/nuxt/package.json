@@ -61,6 +61,7 @@
     "test": "vitest run",
     "test:live:northwind": "vitest run --config vitest.live.config.ts",
     "test:explorer-consumer": "tsx test/verify-explorer-consumer.mts",
+    "test:explorer-native": "tsx test/verify-explorer-native.mts",
     "verify": "vitest run && pnpm run playground:check",
     "build": "nuxt-module-build build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -90,11 +91,13 @@
     "@nuxt/module-builder": "1.0.3",
     "@nuxt/test-utils": "^4.3.4",
     "@types/node": "^26.1.1",
+    "@vitejs/devtools-kit": "0.8.0",
     "nuxt": "^4.6.3",
     "playwright-core": "^1.58.2",
     "tsx": "4.21.0",
     "typescript": "~5.9.3",
     "unbuild": "3.6.1",
+    "vite": "8.3.5",
     "vitest": "4.1.3",
     "vue": "3.5.44"
   }

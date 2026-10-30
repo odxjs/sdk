@@ -1,143 +1,276 @@
+import { EventEmitter } from 'node:events'
 import { existsSync } from 'node:fs'
 import { consola } from 'consola'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { DEVTOOLS_UI_LOCAL_PORT, DEVTOOLS_UI_ROUTE, setupDevToolsUI } from '../src/devtools'
+import { setupDevToolsUI } from '../src/devtools'
 import { createExplorerClientMiddleware } from '../src/devtools-client'
 
-const { startSubprocess } = vi.hoisted(() => ({
-  startSubprocess: vi.fn(),
+const { addVitePlugin, start, current, stop, dispose, createContributor } = vi.hoisted(() => ({
+  addVitePlugin: vi.fn(),
+  start: vi.fn(),
+  current: vi.fn(),
+  stop: vi.fn(),
+  dispose: vi.fn(),
+  createContributor: vi.fn(),
 }))
-
+vi.mock('@nuxt/kit', async original => ({ ...await original<typeof import('@nuxt/kit')>(), addVitePlugin }))
 vi.mock('@nuxt/devtools-kit', () => ({
-  startSubprocess,
+  NUXT_DEVTOOLS_GROUP_ID: 'nuxt',
+  onDevtoolsReady: (callback: (...args: unknown[]) => unknown, nuxt: any) => nuxt.hook('devtools:ready', callback),
 }))
+vi.mock('../src/devtools-contributor', () => ({ createExplorerContributor: createContributor }))
+vi.mock('../src/devtools-client', () => ({ createExplorerClientMiddleware: vi.fn(async () => vi.fn()) }))
+vi.mock('node:fs', async original => ({ ...await original<typeof import('node:fs')>(), existsSync: vi.fn() }))
 
-vi.mock('../src/devtools-client', () => ({
-  createExplorerClientMiddleware: vi.fn(async () => vi.fn()),
-}))
-
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>()
-  return {
-    ...actual,
-    existsSync: vi.fn(),
-  }
-})
-
-function createNuxtHarness() {
-  type NuxtHookCallback = (payload?: unknown) => void | Promise<void>
-  const hooks = new Map<string, NuxtHookCallback[]>()
+function harness(source = false, hasAssets = true, app: { baseURL: string, buildAssetsDir?: string } = { baseURL: '/console/' }) {
+  const hooks = new Map<string, ((...args: any[]) => unknown)[]>()
   const nuxt = {
-    options: {
-      nitro: {},
-    },
-    hook: vi.fn((name: string, callback: NuxtHookCallback) => {
+    options: { app },
+    hook: vi.fn((name: string, callback: (...args: any[]) => unknown) => {
       hooks.set(name, [...(hooks.get(name) || []), callback])
     }),
   } as any
-
+  const resolver = { resolve: (path: string) => ({
+    './client': '/installed/client',
+    './module.ts': '/source/module.ts',
+    '../../explorer': '/source/explorer',
+  }[path] || path) } as any
+  vi.mocked(existsSync).mockImplementation(path => source
+    ? String(path) === '/source/module.ts' || String(path) === '/source/explorer'
+    : hasAssets && String(path).startsWith('/installed/client/'))
+  setupDevToolsUI(nuxt, resolver)
   return {
     nuxt,
-    async callHook(name: string, payload?: unknown) {
+    async callHook(name: string, ...args: unknown[]) {
       for (const callback of hooks.get(name) || [])
-        await callback(payload)
+        await callback(...args)
     },
   }
 }
 
-describe('devtools UI integration', () => {
+function contributorPlugin(): any {
+  return addVitePlugin.mock.calls.map(([plugin]) => plugin).find(plugin => plugin.name === 'odx:explorer-contributor')
+}
+
+describe('native DevTools integration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    current.mockReset().mockReturnValue(undefined)
+    start.mockReset().mockImplementation(() => {
+      const task = Promise.resolve('http://127.0.0.1:45678')
+      current.mockReturnValue(task)
+      return task
+    })
+    stop.mockReset().mockResolvedValue(undefined)
+    dispose.mockReset().mockResolvedValue(undefined)
+    createContributor.mockReturnValue({ start, current, stop, dispose })
+    vi.mocked(createExplorerClientMiddleware).mockResolvedValue(vi.fn())
   })
 
-  it('keeps the host usable when emitted client metadata is incompatible', async () => {
-    const warn = vi.spyOn(consola, 'warn').mockImplementation(() => undefined)
-    try {
-      vi.mocked(existsSync).mockReturnValue(true)
-      vi.mocked(createExplorerClientMiddleware).mockRejectedValueOnce(new Error('Unsupported fixture manifest'))
-      const { nuxt, callHook } = createNuxtHarness()
-      setupDevToolsUI(nuxt, { resolve: (path: string) => path } as any)
-      const middlewareUse = vi.fn()
-      await expect(callHook('vite:serverCreated', { middlewares: { use: middlewareUse } })).resolves.toBeUndefined()
-      const response = { statusCode: 0, setHeader: vi.fn(), end: vi.fn() }
-      middlewareUse.mock.calls[0]![1]({}, response)
-      expect(response.statusCode).toBe(503)
-      expect(warn).toHaveBeenCalledOnce()
-      expect(startSubprocess).not.toHaveBeenCalled()
-    }
-    finally {
-      warn.mockRestore()
-    }
-  })
-
-  it('defers the explorer dev server until Vite is serving', async () => {
-    vi.mocked(existsSync).mockImplementation(path => path === '/repo/packages/explorer' || path === './module.ts')
-
-    const resolver = {
-      resolve: vi.fn((path: string) => {
-        if (path === './client')
-          return '/repo/packages/nuxt/client'
-        if (path === '../../explorer')
-          return '/repo/packages/explorer'
-        return path
-      }),
-    } as any
-    const { nuxt, callHook } = createNuxtHarness()
-
-    setupDevToolsUI(nuxt, resolver)
-
-    expect(startSubprocess).not.toHaveBeenCalled()
+  it('registers exactly one native installed iframe and mounts assets under the app base', async () => {
+    const { nuxt, callHook } = harness()
+    const ctx = { docks: { register: vi.fn() }, commands: { register: vi.fn((_command: { handler: () => Promise<void> }) => ({ unregister: vi.fn() })) } }
     const middlewareUse = vi.fn()
-    await callHook('vite:serverCreated', { middlewares: { use: middlewareUse } })
-    expect(middlewareUse).toHaveBeenCalledWith(DEVTOOLS_UI_ROUTE, expect.any(Function))
-
-    expect(startSubprocess).toHaveBeenCalledTimes(1)
-    expect(startSubprocess).toHaveBeenCalledWith(
-      {
-        command: 'pnpm',
-        args: ['exec', 'nuxi', 'dev', '--host', 'localhost', '--port', DEVTOOLS_UI_LOCAL_PORT.toString()],
-        cwd: '/repo/packages/explorer',
-        env: {
-          ODX_EXPLORER_API_PROXY_TARGET: 'http://localhost:3000',
-        },
-      },
-      {
-        id: 'odx:client',
-        name: 'ODX Explorer Dev',
-      },
-    )
-  })
-
-  it('mounts an emitted client under the application base without launching a child server', async () => {
-    vi.mocked(existsSync).mockImplementation(path => String(path).startsWith('/installed/client/'))
-    const resolver = { resolve: (path: string) => path === './client' ? '/installed/client' : path } as any
-    const { nuxt, callHook } = createNuxtHarness()
-    nuxt.options.app = { baseURL: '/console/' }
-    setupDevToolsUI(nuxt, resolver)
-    const middlewareUse = vi.fn()
-    await callHook('vite:serverCreated', { middlewares: { use: middlewareUse } })
+    await callHook('vite:serverCreated', { middlewares: { use: middlewareUse } }, { isClient: true })
     expect(createExplorerClientMiddleware).toHaveBeenCalledWith('/installed/client', {
       baseURL: '/console/__odx__/client/',
       apiBase: '/console',
     })
-    expect(middlewareUse).toHaveBeenCalledWith('/console/__odx__/client', expect.any(Function))
-    expect(startSubprocess).not.toHaveBeenCalled()
-    const tabs: unknown[] = []
-    await callHook('devtools:customTabs', tabs)
-    expect(tabs).toEqual([expect.objectContaining({ view: { type: 'iframe', src: '/console/__odx__/client/' } })])
+    await callHook('devtools:ready', ctx)
+    await callHook('devtools:ready', ctx)
+    expect(ctx.docks.register).toHaveBeenCalledExactlyOnceWith({
+      id: 'odx',
+      title: 'ODX',
+      icon: 'lucide:cable',
+      type: 'iframe',
+      url: '/console/__odx__/client/',
+      groupId: 'nuxt',
+      category: 'modules',
+    }, true)
+    expect(nuxt.hook.mock.calls.map(([name]: string[]) => name)).not.toContain('devtools:customTabs')
+    expect(createContributor).not.toHaveBeenCalled()
+    expect(contributorPlugin()).toBeUndefined()
   })
 
-  it('reports missing installed assets without falling back to a child process', async () => {
-    vi.mocked(existsSync).mockReturnValue(false)
-    const resolver = { resolve: (path: string) => path } as any
-    const { nuxt, callHook } = createNuxtHarness()
-    setupDevToolsUI(nuxt, resolver)
-    const middlewareUse = vi.fn()
-    await callHook('vite:serverCreated', { middlewares: { use: middlewareUse } })
+  it('keeps the host usable when installed assets are incompatible', async () => {
+    const warn = vi.spyOn(consola, 'warn').mockImplementation(() => undefined)
+    try {
+      vi.mocked(createExplorerClientMiddleware).mockRejectedValueOnce(new Error('Unsupported manifest'))
+      const { callHook } = harness()
+      const use = vi.fn()
+      await callHook('vite:serverCreated', { middlewares: { use } })
+      const response = { statusCode: 0, setHeader: vi.fn(), end: vi.fn() }
+      use.mock.calls[0]![1]({}, response)
+      expect(response.statusCode).toBe(503)
+      expect(warn).toHaveBeenCalledOnce()
+      expect(start).not.toHaveBeenCalled()
+    }
+    finally { warn.mockRestore() }
+  })
+
+  it('does not mount a second static middleware for the SSR Vite environment', async () => {
+    const { callHook } = harness()
+    const use = vi.fn()
+    await callHook('vite:serverCreated', { middlewares: { use } }, { isClient: false })
+    expect(use).not.toHaveBeenCalled()
+  })
+
+  it('reports missing installed assets without falling back to a source process', async () => {
+    const { callHook } = harness(false, false)
+    const use = vi.fn()
+    await callHook('vite:serverCreated', { middlewares: { use } })
     const response = { statusCode: 0, setHeader: vi.fn(), end: vi.fn() }
-    middlewareUse.mock.calls[0]![1]({}, response)
+    use.mock.calls[0]![1]({}, response)
     expect(response.statusCode).toBe(503)
     expect(response.end).toHaveBeenCalledWith(expect.stringContaining('assets are missing'))
-    expect(startSubprocess).not.toHaveBeenCalled()
+    expect(createContributor).not.toHaveBeenCalled()
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('does not launch during prepare or before a native host is ready', async () => {
+    const { callHook } = harness(true)
+    expect(createContributor).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      directory: '/source/explorer',
+      baseURL: '/console/_nuxt/odx-explorer/',
+      apiBase: '/console',
+    }))
+    expect(start).not.toHaveBeenCalled()
+    await callHook('close')
+    expect(dispose).toHaveBeenCalledOnce()
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('launches on demand and restores the launcher after the process stops', async () => {
+    const { callHook } = harness(true)
+    const ctx = { docks: { register: vi.fn() }, commands: { register: vi.fn((_command: { handler: () => Promise<void> }) => ({ unregister: vi.fn() })) } }
+    await callHook('devtools:ready', ctx)
+    const launcher = ctx.docks.register.mock.calls[0]![0]
+    expect(launcher.type).toBe('launcher')
+    expect(start).not.toHaveBeenCalled()
+    expect(JSON.parse(JSON.stringify(launcher)).launcher.command).toBe('odx:explorer:start')
+    await ctx.commands.register.mock.calls[0]![0].handler()
+    expect(start).toHaveBeenCalledOnce()
+    expect(ctx.docks.register).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'iframe', url: '/console/_nuxt/odx-explorer/?odxInstance=1' }), true)
+    createContributor.mock.calls[0]![0].onStopped()
+    expect(ctx.docks.register).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'launcher' }), true)
+    await ctx.commands.register.mock.calls[0]![0].handler()
+    expect(ctx.docks.register).toHaveBeenLastCalledWith(expect.objectContaining({
+      type: 'iframe',
+      frameId: 'odx:client:2',
+      url: '/console/_nuxt/odx-explorer/?odxInstance=2',
+    }), true)
+    await callHook('close')
+    expect(dispose).toHaveBeenCalledOnce()
+    expect(ctx.commands.register.mock.results[0]!.value.unregister).toHaveBeenCalledOnce()
+  })
+
+  it('proxies the same-origin UI/HMR mount to the discovered port and strips host credentials', async () => {
+    harness(true)
+    current.mockReturnValue(Promise.resolve('http://127.0.0.1:45678'))
+    const plugin = contributorPlugin()
+    expect(plugin.apply).toBe('serve')
+    const configuration = plugin.config()
+    const proxy = configuration.server.proxy['/console/_nuxt/odx-explorer/']
+    expect(proxy.ws).toBe(true)
+    const emitter = new EventEmitter()
+    proxy.configure(emitter, proxy)
+    await proxy.bypass({ url: '/console/_nuxt/odx-explorer/_nuxt/test.js' }, {})
+    expect(proxy.target).toBe('http://127.0.0.1:45678')
+    expect(start).not.toHaveBeenCalled()
+    const removeHeader = vi.fn()
+    emitter.emit('proxyReq', { removeHeader })
+    emitter.emit('proxyReqWs', { removeHeader })
+    expect(removeHeader.mock.calls).toEqual([['authorization'], ['cookie'], ['authorization'], ['cookie']])
+    expect(Object.keys(configuration.server.proxy)).toEqual(['/console/_nuxt/odx-explorer/'])
+  })
+
+  it('returns a bounded HTTP/WS failure if the contributor cannot start', async () => {
+    harness(true)
+    const proxy = contributorPlugin().config().server.proxy['/console/_nuxt/odx-explorer/']
+    proxy.configure(new EventEmitter(), proxy)
+    const response = { statusCode: 0, setHeader: vi.fn(), end: vi.fn() }
+    const path = '/console/_nuxt/odx-explorer/'
+    expect(await proxy.bypass({ url: path }, response)).toBe(path)
+    expect(response.statusCode).toBe(503)
+    expect(response.end).toHaveBeenCalledWith('Start the repository Explorer from its Nuxt DevTools launcher.')
+    expect(await proxy.bypass({ url: path }, undefined)).toBe(false)
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('gives only the client proxy the public HMR upgrade owner', () => {
+    harness(true, true, { baseURL: '/tenant/', buildAssetsDir: '/assets/' })
+    const plugin = contributorPlugin()
+    expect(addVitePlugin.mock.calls.find(([entry]) => entry === plugin)![1]).toEqual({ server: false })
+    expect(Object.keys(plugin.config().server.proxy)).toEqual(['/tenant/assets/odx-explorer/'])
+    const server = new EventEmitter()
+    const config = { server: { middlewareMode: true, hmr: { server } } }
+    plugin.configResolved(config)
+    expect(config.server.middlewareMode).toEqual({ server })
+    const noListener = { server: { middlewareMode: true, hmr: false } }
+    plugin.configResolved(noListener)
+    expect(noListener.server.middlewareMode).toBe(true)
+  })
+
+  it('keeps contributor failures out of unauthenticated frontend responses', async () => {
+    harness(true)
+    const warn = vi.spyOn(consola, 'warn').mockImplementation(() => {})
+    try {
+      const failure = new Error('Cannot resolve C:/private/source/nuxt/package.json')
+      current.mockReturnValue(Promise.reject(failure))
+      const proxy = contributorPlugin().config().server.proxy['/console/_nuxt/odx-explorer/']
+      proxy.configure(new EventEmitter(), proxy)
+      const response = { statusCode: 0, setHeader: vi.fn(), end: vi.fn() }
+      await proxy.bypass({ url: '/console/_nuxt/odx-explorer/' }, response)
+      expect(response.statusCode).toBe(503)
+      expect(response.end).toHaveBeenCalledWith('The ODX Explorer is unavailable. Inspect its native terminal and restart it from the DevTools launcher.')
+      expect(warn).toHaveBeenCalledWith(expect.any(String), failure)
+    }
+    finally { warn.mockRestore() }
+  })
+
+  it('does not register a replacement dock when host shutdown races with reconnect', async () => {
+    const { callHook } = harness(true)
+    const old = { docks: { register: vi.fn() }, commands: { register: vi.fn((_command: { handler: () => Promise<void> }) => ({ unregister: vi.fn() })) } }
+    const next = { docks: { register: vi.fn() }, commands: { register: vi.fn((_command: { handler: () => Promise<void> }) => ({ unregister: vi.fn() })) } }
+    await callHook('devtools:ready', old)
+    let resolve!: () => void
+    stop.mockReturnValueOnce(new Promise<void>(done => resolve = done))
+    const reconnect = callHook('devtools:ready', next)
+    await callHook('close')
+    resolve()
+    await reconnect
+    expect(next.docks.register).not.toHaveBeenCalled()
+  })
+
+  it('uses late Nuxt loopback discovery without widening a LAN-facing RPC listener', () => {
+    const { nuxt } = harness()
+    const plugin = addVitePlugin.mock.calls[0]![0]
+    expect(plugin.config()).toEqual({})
+    nuxt.options.devServer = { host: '127.0.0.1' }
+    expect(plugin.config()).toEqual({ server: { host: '127.0.0.1' } })
+    nuxt.options.devServer.host = '::1'
+    expect(plugin.config()).toEqual({ server: { host: '::1' } })
+    nuxt.options.devServer.host = '0.0.0.0'
+    expect(plugin.config()).toEqual({})
+  })
+
+  it('rejects a launcher belonging to a replaced host before starting any process', async () => {
+    const { callHook } = harness(true)
+    const previous = { docks: { register: vi.fn() }, commands: { register: vi.fn((_command: { handler: () => Promise<void> }) => ({ unregister: vi.fn() })) } }
+    const next = { docks: { register: vi.fn() }, commands: { register: vi.fn((_command: { handler: () => Promise<void> }) => ({ unregister: vi.fn() })) } }
+    await callHook('devtools:ready', previous)
+    const command = previous.commands.register.mock.calls[0]![0]
+    await callHook('devtools:ready', next)
+    await expect(command.handler()).rejects.toThrow('host changed')
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('keeps the launcher if a process exits before its iframe can be registered', async () => {
+    const { callHook } = harness(true)
+    const ctx = { docks: { register: vi.fn() }, commands: { register: vi.fn((_command: { handler: () => Promise<void> }) => ({ unregister: vi.fn() })) } }
+    await callHook('devtools:ready', ctx)
+    start.mockResolvedValueOnce('http://127.0.0.1:45678')
+    await ctx.commands.register.mock.calls[0]![0].handler()
+    expect(ctx.docks.register).toHaveBeenCalledOnce()
   })
 })

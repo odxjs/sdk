@@ -38,7 +38,7 @@ export default defineNuxtConfig({
     : {},
 
   app: {
-    baseURL: '/__odx__/client/',
+    baseURL: process.env.ODX_EXPLORER_CLIENT_BASE || '/__odx__/client/',
     buildAssetsDir: '_nuxt',
   },
 

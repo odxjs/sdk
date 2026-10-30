@@ -160,7 +160,7 @@ The Nuxt module is the host integration layer. Its setup flow is:
    events.
 6. Register the proxy Nitro module.
 7. Generate OData model and registry types during `prepare:types`.
-8. Register the ODX Explorer as a Nuxt DevTools custom tab in development.
+8. Register the ODX Explorer as a native Nuxt DevTools v4 dock in development.
 
 The runtime composable maps structured independent read batches, typed service-level actions, root updates,
 contained-entity mutations and media streams, and non-contained relationship
@@ -213,16 +213,31 @@ not nested runtime dependencies. Its standalone repository builds use pinned
 development dependencies. This prevents an installed layer from bringing a
 second framework and incompatible build-tool peers into a newer host app.
 
-Explorer has two delivery modes:
+Explorer has three delivery modes:
 
-- In local Nuxt development, it is embedded as a Nuxt DevTools tab at
-  `/__odx__/client/`. The host module starts the Explorer dev server on port
-  `3300` and proxies DevTools traffic to it.
+- An installed Nuxt module serves its verified, prerendered Explorer client at
+  `<appBase>/__odx__/client/`. Native DevTools v4 registers one iframe in the
+  Nuxt group. No separate UI process or Explorer runtime dependency is needed.
+- A repository source host exposes a native launcher instead. Its authenticated
+  host command starts one terminal-owned Nuxt client on an allocated loopback
+  port. HTTP and HMR are proxied under
+  `<appBase>/<buildAssetsDir>/odx-explorer/`, within Nuxt's Vite upgrade namespace.
+  OData/config/log requests keep the host's app base and existing authorization.
+  The frontend proxy strips host cookies and Authorization before forwarding to
+  the child. Closing the host or replacing its DevTools context disposes the
+  owned process; termination restores the launcher. HTTP requests cannot start
+  a process. Missing installed assets return 503 rather than launching source.
 - In SAP BTP production deployments, it is a standalone Nitro-built browser app
   served by the `odx-explorer` module behind the AppRouter. AppRouter routes
   `/__odx__/client` and `/__odx__/client/*` to the Explorer UI, and narrowly
   routes only `/__odx__/{config,logs,schema,generate,types,me}` to the proxy
   runtime API.
+
+Ordinary production application builds do not register the dock, client route
+or contributor proxy. The operational standalone/layer deployment is explicit.
+The native adapter targets Nuxt 4.6.3+ and DevTools 4; it does not retain a v3
+custom-tab shim. OData semantics and server policy remain independent of the
+Devframe host lifecycle.
 
 Explorer reads from the internal proxy APIs:
 

@@ -69,3 +69,4 @@ packages/proxy/public/
 
 # Generated deployment archives
 packages/explorer/*.zip
+/.artifacts/explorer-native-host/

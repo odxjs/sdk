@@ -71,9 +71,49 @@ Current receipts: `state-static-reviewed.json` (63/63),
 `installed-consumer-compiler-baseline/receipt.json` under the baseline evidence
 directory. The latter records commands, timings and source/output fingerprints;
 the resolved versions are beside it in `dependency-versions.json`.
-Nuxt/UI/Vite/DevTools workspace versions remain unchanged until slice C.
+Those B receipts predate the coherent stack upgrade in slice C below.
 
 ### C implementation decisions
+
+C1 is committed as `d07037c`. C2 replaces the legacy custom-tab/process calls
+with native DevTools 4 dock, command and terminal contracts. The initial
+unpublished Nuxt module now declares Nuxt `>=4.6.3 <5` compatibility, matching
+the upgraded layer/toolchain; a v3 custom-tab shim is deliberately not retained.
+Framework-neutral transport packages keep their independent runtime floors.
+
+Installed modules register the shipped static iframe and start no child.
+Only a repository launcher command can start a source client; a GET/WS cannot.
+Ports come from the actual Nuxt listener announcement, and native termination,
+context replacement and Nuxt close own cleanup. Source HTTP/HMR mount under
+the host's Vite asset namespace, while OData/config/log calls keep the host's
+API base and policy. Parent credentials are stripped only on frontend proxy
+forwarding. Default DevTools authorization remains enabled.
+
+Actual native Chromium use exposed issues absent from the mocked adapter tests:
+Kit's `build: false` option skipped the plugin even in development; the RPC
+sidecar initially used a different loopback family; an `onLaunch` function was
+dropped by shared-state serialization; and an out-of-asset WS upgrade also
+reached Nitro. The adapter now uses serve-only plugins, late public listener
+host discovery, a registered authenticated command, and one client-environment
+proxy under the Vite asset mount. Public HMR listener options connect its WS
+upgrade owner; no private Nuxt listener field or manual global listener removal
+is used. The source probe completes data/schema/log/proxy navigation and both
+host/client HMR handshakes with zero browser errors. The permanent native
+browser gate additionally exercises terminal termination and relaunch.
+
+The permanent native gate passes in 64.24 s, including the normal local OTP
+flow, two real Nuxt client starts and graceful host disposal. Its receipt is
+`c2-native-final/receipt.json` under the baseline evidence directory: no page or
+console errors, no failed browser responses, and actual host/client HMR
+connections. Twenty-one focused adapter/native-terminal cases and root
+TypeScript checking pass. The updated packed-consumer check is still pending.
+
+The viewer retains visited iframe panes and initializes their document URL
+once. A restart therefore registers a fresh public `frameId` and instance URL,
+while retaining the stable ODX dock id. The native browser gate confirms a new
+document navigation and that the old pane no longer accepts pointer events.
+This also exposes the next embedded-UX slice: a hidden pane's document stays
+`visible`, so document visibility alone cannot pause its background polling.
 
 The next bounded change updates the primary Nuxt host to 4.6.3, Kit/Schema to
 the same version, Test Utils to 4.3.4 and Module Builder to 1.0.3. The initial

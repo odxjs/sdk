@@ -14,6 +14,7 @@ export default defineNuxtModule<ModuleOptions>({
   meta: {
     name: '@me-tools/odx-nuxt',
     configKey: 'odata',
+    compatibility: { nuxt: '>=4.6.3 <5' },
   },
   defaults: {
     mode: 'sdk',

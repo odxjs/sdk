@@ -35,9 +35,27 @@ Regenerate API reference metadata:
 pnpm run docs:api
 ```
 
-The Nuxt module starts the Explorer DevTools UI from `packages/explorer` during
-local development. The Explorer dev server uses port `3300` and is mounted in
-the host app at `/__odx__/client/`.
+Open Nuxt DevTools v4 and choose **Nuxt → ODX**. An installed module serves its
+bundled Explorer at `<appBase>/__odx__/client/` without starting another process.
+In a repository source host, choose **Start** to launch the development client
+on an allocated port. Its iframe and HMR use the host's Vite asset mount, for
+example `/console/_nuxt/odx-explorer/`. Business requests remain on the host.
+The running client appears in native Terminals; terminating it restores the
+launcher, and closing the host closes its owned client. Nuxt DevTools' normal
+local authorization remains enabled. No fixed port 3300 is reserved by this
+integration; standalone Explorer development can still use its own default.
+
+Verify the actual native source-host interaction independently of the static
+installed-consumer check:
+
+```bash
+pnpm --filter @me-tools/odx-nuxt test:explorer-native
+```
+
+This starts owned local hosts and Chromium against synthetic OData. It exercises
+local authorization, native launch, data/schema/log/proxy navigation, same-origin
+HMR, termination and relaunch. Receipts and screenshots go to the ignored
+`.artifacts/explorer-native-host/`; no code or authorization token is persisted.
 
 Local Explorer endpoints are optimized for developer feedback. They can expose
 resolved config, local generated types, raw metadata XML, and in-memory traffic

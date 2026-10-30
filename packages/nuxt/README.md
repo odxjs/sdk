@@ -7,6 +7,14 @@ Node 22/24, matching its Nuxt Kit 4.6 toolchain. The workspace pins pnpm
 11.28.9. This tooling update does not replace the framework-neutral core or
 proxy runtime contracts.
 
+The supported Nuxt host floor is 4.6.3, with Nuxt DevTools 4 selected explicitly
+by the application (see its official v4 upgrade guide). The Explorer appears
+under **Nuxt → ODX** as a native iframe dock. Installed packages serve the
+verified client without spawning another server. Repository source hosts use
+the native **Start** launcher and terminal lifecycle with allocated ports.
+The v3 custom-tab integration is not retained in this unpublished release.
+Disabling ODX DevTools or building production registers neither dock nor client.
+
 Nuxt auto-imports `useOData` in application code. Nitro server routes use
 explicit request-context-aware read and mutation services instead of rebuilding
 proxy paths or calling an upstream origin directly:
