@@ -8,6 +8,7 @@ export default defineVitestProject({
   test: {
     name: 'explorer',
     include: ['test/**/*.test.ts'],
+    exclude: ['test/browser.e2e.test.ts'],
     environmentOptions: {
       nuxt: { rootDir },
     },

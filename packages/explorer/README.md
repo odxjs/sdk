@@ -32,5 +32,16 @@ The Explorer declares a Nuxt Vitest workspace project with a package-relative
 root. Its state tests use that project's existing Nuxt app context instead of
 creating a competing application. Browser journeys are verified separately.
 
+```bash
+pnpm --filter @me-tools/odx-nuxt exec playwright-core install chromium
+pnpm --filter @me-tools/odx-explorer test:browser
+```
+
+The browser check builds its own Explorer, owns its temporary preview and uses
+real ODX handlers against a synthetic loopback OData service. It never requires
+SAP credentials. `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` can select an existing
+compatible Chromium installation; otherwise Playwright uses its installed
+default. Set `ODX_EXPLORER_BROWSER_EVIDENCE=1` to keep local journey screenshots.
+
 For documentation on the DevTools UI and debugging patterns, see the root
 documentation in this repository.

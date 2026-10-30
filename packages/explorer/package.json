@@ -39,6 +39,7 @@
     "prepare": "nuxi prepare",
     "preview": "nuxi preview",
     "verify": "vitest run && pnpm run typecheck",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
     "typecheck": "nuxi typecheck",
     "prepack": "pnpm run verify"
   },

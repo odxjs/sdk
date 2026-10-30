@@ -4,8 +4,6 @@ import { VueFlow } from '@vue-flow/core'
 import { useSchemaExplorer } from '../../composables/useSchemaExplorer'
 
 const {
-  globalNodes,
-  globalEdges,
   nodeTypes,
   containerRef,
   isReady,
@@ -19,9 +17,8 @@ const {
       class="absolute inset-0 transition-opacity duration-500 bg-transparent"
       :class="{ 'opacity-0': !isReady, 'opacity-100': isReady }"
     >
+      <!-- The injected Vue Flow store owns nodes/edges; do not feed it back as v-model. -->
       <VueFlow
-        v-model:nodes="globalNodes"
-        v-model:edges="globalEdges"
         :node-types="nodeTypes"
         :min-zoom="0.05"
         :max-zoom="4"
