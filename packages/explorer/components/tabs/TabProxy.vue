@@ -6,7 +6,7 @@ import { buildOdxApiEndpoint, useSharedODataState } from '../../composables/useO
 const { logs, useCORSBridge, selectedTraceLogId } = useSharedODataState()
 
 // Fetch current identity data
-const { data: me } = await useFetch<any>(buildOdxApiEndpoint('/__odx__/me'))
+const { data: me } = await useFetch<any>(buildOdxApiEndpoint('/__odx__/me'), { baseURL: '/' })
 
 // Get the trace of the absolute latest request that went through the proxy
 const latestLiveRequest = computed(() => {

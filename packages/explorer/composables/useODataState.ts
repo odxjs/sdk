@@ -175,7 +175,12 @@ export function buildRuntimeProxyUrl(path: string): string {
     return path
 
   try {
-    return `${new URL(apiBase).origin}${path}`
+    const base = new URL(apiBase, 'http://odx.local')
+    const hostBase = base.pathname.endsWith('/__odx__')
+      ? base.pathname.slice(0, -'/__odx__'.length)
+      : base.pathname.replace(RE_TRAILING_SLASHES, '')
+    const origin = apiBase.startsWith('//') ? `//${base.host}` : RE_ABSOLUTE_HTTP_URL.test(apiBase) ? base.origin : ''
+    return `${origin}${hostBase}${path}`
   }
   catch {
     return path

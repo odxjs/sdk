@@ -16,6 +16,7 @@ node_modules
 /.codex-*.patch
 /.codex-visual-temp/
 /nf-*.png
+/.artifacts/explorer-installed-consumer/
 
 # Yarn
 **/.yarn/cache

@@ -19,6 +19,8 @@ interface RecordedRequest {
 
 interface ExplorerBrowserBackend {
   readonly origin: string
+  readonly serviceUrl: string
+  readonly metadata: string
   readonly requests: RecordedRequest[]
   readonly reset: () => Promise<void>
   readonly close: () => Promise<void>
@@ -52,6 +54,11 @@ export async function createExplorerBrowserBackend(): Promise<ExplorerBrowserBac
     for await (const chunk of request)
       chunks.push(Buffer.from(chunk))
     requests.push({ method: request.method, url: request.url, body: Buffer.concat(chunks).toString(), sessionHeader: request.headers['x-odx-browser-session'] })
+    if (request.method === 'GET' && request.url === '/odata/$metadata') {
+      response.setHeader('Content-Type', 'application/xml')
+      response.end(xml)
+      return
+    }
     response.setHeader('Content-Type', 'application/json')
     if (request.method !== 'GET') {
       if (request.url !== '/odata/Products(0)' || !['PATCH', 'DELETE'].includes(request.method || '')) {
@@ -88,6 +95,8 @@ export async function createExplorerBrowserBackend(): Promise<ExplorerBrowserBac
   const origin = await listen(gateway)
   return {
     origin,
+    serviceUrl: `${upstreamOrigin}/odata`,
+    metadata: xml,
     requests,
     async reset() {
       requests.splice(0)

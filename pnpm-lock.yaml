@@ -257,9 +257,6 @@ importers:
       '@me-tools/odx-core':
         specifier: workspace:*
         version: link:../core
-      '@me-tools/odx-explorer':
-        specifier: workspace:*
-        version: link:../explorer
       '@me-tools/odx-metadata':
         specifier: workspace:*
         version: link:../metadata
@@ -297,6 +294,9 @@ importers:
         specifier: 3.0.2
         version: 3.0.2
     devDependencies:
+      '@me-tools/odx-explorer':
+        specifier: workspace:*
+        version: link:../explorer
       '@nuxt/module-builder':
         specifier: 1.0.2
         version: 1.0.2(@nuxt/cli@3.36.1(@nuxt/schema@4.4.8)(cac@6.7.14)(magicast@0.5.3))(@vue/compiler-core@3.5.39)(esbuild@0.28.1)(typescript@5.9.3)(vue-tsc@3.2.6(typescript@5.9.3))(vue@3.5.39(typescript@5.9.3))

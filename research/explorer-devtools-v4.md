@@ -1,10 +1,77 @@
 # ODX Explorer: current audit and DevTools v4 migration plan
 
 Recorded 2026-10-30. Baseline: ODX `main` at `9f8940a`.
-Status: proposed implementation sequence, not a completed migration or release
-acceptance. This document was developed with a read-only Claude Opus 5.5 review
-of selected synthetic project source. No dependency or runtime source changes
-were made for the audit.
+The audit below records that original revision. Implementation is now in
+progress; the v4 migration and release acceptance are not complete. The audit
+and subsequent implementation reviews use Claude Opus 5.5 with selected
+synthetic project source.
+
+## Implementation progress
+
+The executable baseline/controller work is implemented in local commits
+`e59c959`, `f0f5f77`, `586080b`, `cb0bebd`, `e63b9dd` and `e6dc130`:
+
+- The root Vitest workspace now uses a package-root Nuxt test project. The
+  original missing-import collection failure is fixed without reinstalling or
+  changing framework versions.
+- Service opening reproduced a Vue Flow store feedback loop. Removing the
+  store-to-`v-model` feedback restores normal pointer and keyboard use.
+- ID zero remains an update/delete identity. Missing update identity fails
+  closed; deletion failures and session headers are handled explicitly.
+- Shared controllers/effects belong to one app. Read cancellation also rejects
+  late transport/body results; cache keys and query inputs are captured before
+  dispatch. Graph ownership follows its rendered component and survives a
+  remount; a dispatched non-GET outcome remains available after navigation.
+- Log polling coalesces slow reads, pauses while hidden and stops on unmount.
+  Old polls cannot restore cleared history. Config/log 401/403 responses show
+  visible errors and Retry, and clear previously displayed private state.
+
+Executed evidence: 54 focused state/layer/lifecycle tests passed on the
+controller slice, and eight freshly built production-browser cases passed with
+exit code zero in 44.45 seconds. The browser cases cover actual service/card
+activation, entity read, painted schema, traffic/proxy inspection, zero-ID
+writes, missing-key rejection, delayed selection and denied-state recovery.
+The graph remount regression uses an actual mounted Vue/Nuxt component. These
+are local synthetic contracts, not authenticated SAP/BTP acceptance.
+
+The raw before evidence remains in
+`.artifacts/explorer-baseline-dev-2026-10-30/browser.json`; current receipts are
+under `.artifacts/explorer-baseline-2026-10-30/`, including
+`browser-controller-cleanup.{json,log}` and the Opus review receipts.
+
+Slice B's outside-workspace packed consumer now passes. A prerendered client,
+including 103 source/default UI icons, is emitted without removing the
+standalone Node output and copied into the Nuxt package. Its manifest verifies
+the coordinated package version, source/lockfile fingerprints, exact files and
+byte identity. Installed serving uses one host origin, preserves `/console/`
+for both operational and proxy calls, and starts no contributor UI server.
+Missing/incompatible assets return 503 while the host stays usable. The
+static allowlist rejects raw traversal and missing assets instead of returning
+an HTML shell for script requests.
+
+The real installed host revealed and fixed an existing Nitro integration gap:
+early request hooks must normalize `runtimeConfig.app.baseURL` before matching
+proxy/auth routes. This is isolated in commit `964eddf`; 96 focused proxy and
+policy cases pass. Existing endpoint-level production policy remains in force.
+
+The final consumer run took 130.75 seconds, including fresh serial builds of
+metadata/core/proxy/Nuxt, four tarballs, clean installation, real Chromium
+navigation/read/reload, a production build and actual production HTTP checks.
+It verifies the installed module's dependency graph (no Explorer/UI/graph
+runtime packages), the shipped client hashes, the developer route's 404, normal
+public synthetic OData reads, and rejection of unauthenticated operational
+metadata, including ambiguous base-prefix paths. It supplies the workspace's
+TypeScript 5.9.3 explicitly as the host compiler; a compiler-less fixture had
+allowed the generator's broad peer range to choose an incompatible compiler.
+The resolved SDK generator was 0.40.2. This is a pinned-baseline delivery proof,
+not acceptance of future compiler majors.
+
+Current receipts: `state-static-reviewed.json` (63/63),
+`nested-proxy-context.json` (96/96), and
+`installed-consumer-compiler-baseline/receipt.json` under the baseline evidence
+directory. The latter records commands, timings and source/output fingerprints;
+the resolved versions are beside it in `dependency-versions.json`.
+Nuxt/UI/Vite/DevTools workspace versions remain unchanged until slice C.
 
 ## Recommendation
 

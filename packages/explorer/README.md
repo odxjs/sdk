@@ -28,6 +28,13 @@ The same state and layer tests also run from the workspace root:
 pnpm exec vitest run packages/explorer/test
 ```
 
+The repository build emits both the existing standalone Node application and
+a static client under `dist/client`. The exported `./client-manifest` records
+the package version, source and lockfile fingerprints, build identity and exact
+file hashes. Its icons are bundled locally; the installed Nuxt-module client
+does not require an icon API. The Nuxt package copies this client at build time
+while the Explorer's default export remains the independently usable Nuxt layer.
+
 The Explorer declares a Nuxt Vitest workspace project with a package-relative
 root. Its state tests use that project's existing Nuxt app context instead of
 creating a competing application. Browser journeys are verified separately.

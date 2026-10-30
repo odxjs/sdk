@@ -613,6 +613,49 @@ When `supportsV2FunctionImportResponses === true`, use
 `invokeFunctionImportWithResponse` with the same invocation to retain an
 optional body, ETag, Location, and SAP message without issuing a follow-up read.
 
+## Explorer delivery
+
+The installed module serves its prebuilt Explorer on the host origin in
+development, including under an application base such as `/console/`. It does
+not install the Explorer layer, Nuxt UI or graph libraries as server runtime
+dependencies, or start a separate UI server. Static icons are included in the
+client. Existing operational API authentication remains owned by the host.
+Ordinary production builds do not mount this developer UI. The standalone
+Explorer layer is a separate deliberate operations surface.
+
+Package builds require a matching Explorer build first:
+
+```bash
+pnpm --filter @me-tools/odx-explorer build
+pnpm --filter @me-tools/odx-nuxt build
+```
+
+The build checks the Explorer source, workspace lockfile and coordinated
+package version before copying its emitted client. The client manifest records
+its build identity and exact file hashes. Missing or incompatible installed
+assets produce a bounded 503 diagnostic; they do not crash the host server or
+start a contributor process. Source-checkout contributor serving is separate
+and will adopt the DevTools v4 process lifecycle in the next migration slice.
+
+After building the packages, run the outside-workspace installed-consumer
+proof separately from ordinary unit tests:
+
+```bash
+pnpm --filter @me-tools/odx-nuxt exec playwright-core install chromium
+pnpm --filter @me-tools/odx-nuxt test:explorer-consumer
+```
+
+It packs local artifacts without publication, installs an owned temporary host,
+checks the installed dependency graph and client hashes, and exercises actual
+browser navigation and data reads under `/console/`, including a deep-path
+reload. It also checks production asset exclusion and the developer route's
+404 response. It rebuilds metadata/core/proxy/Nuxt serially before packing and
+records source and output fingerprints. Its fixture pins the current
+Vue/H3/PG/TypeScript baseline so a delivery
+check does not silently become an unrelated dependency upgrade. Evidence is
+written to `.artifacts/explorer-installed-consumer/`; a command argument can
+select another evidence directory. Temporary hosts are shut down and removed.
+
 ## Verification
 
 From the repository root:

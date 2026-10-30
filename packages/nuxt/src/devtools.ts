@@ -1,40 +1,52 @@
 import type { Resolver } from '@nuxt/kit'
 import type { Nuxt } from 'nuxt/schema'
 import { existsSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { dirname } from 'node:path'
 import { startSubprocess } from '@nuxt/devtools-kit'
+import { consola } from 'consola'
+import { createExplorerClientMiddleware } from './devtools-client'
 
 export const DEVTOOLS_UI_ROUTE = '/__odx__/client'
 export const DEVTOOLS_UI_LOCAL_PORT = 3300
+const RE_TRAILING_SLASH = /\/$/
+const ASSETS_UNAVAILABLE = 'ODX Explorer assets are missing or incompatible. Rebuild the coordinated Explorer and Nuxt packages; installed applications do not start a separate UI server.'
+
+function unavailableClient(_request: unknown, response: { statusCode: number, setHeader: (name: string, value: string) => unknown, end: (body: string) => unknown }): void {
+  response.statusCode = 503
+  response.setHeader('Content-Type', 'text/plain; charset=utf-8')
+  response.end(ASSETS_UNAVAILABLE)
+}
 
 export function setupDevToolsUI(nuxt: Nuxt, resolver: Resolver): void {
   function resolveExplorerDirectory(resolver: Resolver): string | undefined {
     const workspaceDirectory = resolver.resolve('../../explorer')
-    if (existsSync(workspaceDirectory))
+    // Only the source checkout may launch a contributor server. Installed
+    // packages must use their emitted client, even if the layer is installed.
+    if (existsSync(resolver.resolve('./module.ts')) && existsSync(workspaceDirectory))
       return workspaceDirectory
-
-    try {
-      const require = createRequire(import.meta.url)
-      return dirname(require.resolve('@me-tools/odx-explorer/package.json'))
-    }
-    catch {
-      return undefined
-    }
+    return undefined
   }
 
   const clientPath = resolver.resolve('./client')
-  const isProductionBuild = existsSync(clientPath)
-  let devtoolsUiSrc = `${DEVTOOLS_UI_ROUTE}/`
+  const hasStaticClient = existsSync(`${clientPath}/manifest.json`) && existsSync(`${clientPath}/index.html`)
+  const appBase = `/${(nuxt.options.app?.baseURL || '/').split('/').filter(Boolean).join('/')}`.replace(RE_TRAILING_SLASH, '')
+  const mountedRoute = `${appBase}${DEVTOOLS_UI_ROUTE}`
+  let devtoolsUiSrc = `${mountedRoute}/`
 
   // Serve production-built client (used when package is published)
-  if (isProductionBuild) {
-    nuxt.hook('vite:serverCreated', async (server) => {
-      const sirv = await import('sirv').then(r => r.default || r)
-      server.middlewares.use(
-        DEVTOOLS_UI_ROUTE,
-        sirv(clientPath, { dev: true, single: true }),
-      )
+  if (hasStaticClient) {
+    nuxt.hook('vite:serverCreated', async (server, environment) => {
+      if (environment && !environment.isClient)
+        return
+      try {
+        server.middlewares.use(
+          mountedRoute,
+          await createExplorerClientMiddleware(clientPath, { baseURL: `${mountedRoute}/`, apiBase: appBase }),
+        )
+      }
+      catch (error) {
+        consola.warn('[ODX] Explorer assets are unavailable; the host dev server remains usable.', error)
+        server.middlewares.use(mountedRoute, unavailableClient)
+      }
     })
   }
   // In local development, start a separate Nuxt server and proxy to serve the client.
@@ -71,6 +83,11 @@ export function setupDevToolsUI(nuxt: Nuxt, resolver: Resolver): void {
           res.setHeader('Location', explorerUrl)
           res.end()
         })
+      })
+    }
+    else {
+      nuxt.hook('vite:serverCreated', (server) => {
+        server.middlewares.use(mountedRoute, unavailableClient)
       })
     }
   }

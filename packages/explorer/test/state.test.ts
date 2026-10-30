@@ -297,6 +297,22 @@ describe('explorer State Composable', () => {
     }
   })
 
+  it.each(['/console', '/console/__odx__/', 'https://proxy.example.test/console/__odx__', '//proxy.example.test/console/__odx__/'])('keeps the host base for embedded API and proxy requests: %s', (base) => {
+    const previousRuntimeConfig = (globalThis as any).useRuntimeConfig
+    ;(globalThis as any).useRuntimeConfig = () => ({ public: { odxApiBase: base } })
+    try {
+      const expected = base.startsWith('https:') ? 'https://proxy.example.test/console' : base.startsWith('//') ? '//proxy.example.test/console' : '/console'
+      expect(buildSchemaEndpointUrl('Catalog')).toBe(`${expected}/__odx__/schema?service=Catalog`)
+      expect(buildRuntimeProxyUrl('/api/odx/catalog/Products')).toBe(`${expected}/api/odx/catalog/Products`)
+    }
+    finally {
+      if (previousRuntimeConfig)
+        (globalThis as any).useRuntimeConfig = previousRuntimeConfig
+      else
+        delete (globalThis as any).useRuntimeConfig
+    }
+  })
+
   it('returns metadata refresh results without requiring SDK generation semantics', async () => {
     ;(globalThis.fetch as any)
       .mockResolvedValueOnce({

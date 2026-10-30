@@ -60,6 +60,7 @@
     "prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxi prepare test/fixtures/isolated",
     "test": "vitest run",
     "test:live:northwind": "vitest run --config vitest.live.config.ts",
+    "test:explorer-consumer": "tsx test/verify-explorer-consumer.mts",
     "verify": "vitest run && pnpm run playground:check",
     "build": "nuxt-module-build build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -68,7 +69,6 @@
   },
   "dependencies": {
     "@me-tools/odx-core": "workspace:*",
-    "@me-tools/odx-explorer": "workspace:*",
     "@me-tools/odx-metadata": "workspace:*",
     "@me-tools/odx-proxy": "workspace:*",
     "@nuxt/devtools-kit": "3.2.4",
@@ -83,6 +83,7 @@
     "sirv": "3.0.2"
   },
   "devDependencies": {
+    "@me-tools/odx-explorer": "workspace:*",
     "@nuxt/module-builder": "1.0.2",
     "@nuxt/test-utils": "^4.0.0",
     "@types/node": "^26.1.1",

@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs'
+import { consola } from 'consola'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEVTOOLS_UI_LOCAL_PORT, DEVTOOLS_UI_ROUTE, setupDevToolsUI } from '../src/devtools'
+import { createExplorerClientMiddleware } from '../src/devtools-client'
 
 const { startSubprocess } = vi.hoisted(() => ({
   startSubprocess: vi.fn(),
@@ -8,6 +10,10 @@ const { startSubprocess } = vi.hoisted(() => ({
 
 vi.mock('@nuxt/devtools-kit', () => ({
   startSubprocess,
+}))
+
+vi.mock('../src/devtools-client', () => ({
+  createExplorerClientMiddleware: vi.fn(async () => vi.fn()),
 }))
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -19,7 +25,7 @@ vi.mock('node:fs', async (importOriginal) => {
 })
 
 function createNuxtHarness() {
-  type NuxtHookCallback = (payload?: unknown) => void
+  type NuxtHookCallback = (payload?: unknown) => void | Promise<void>
   const hooks = new Map<string, NuxtHookCallback[]>()
   const nuxt = {
     options: {
@@ -32,9 +38,9 @@ function createNuxtHarness() {
 
   return {
     nuxt,
-    callHook(name: string, payload?: unknown) {
+    async callHook(name: string, payload?: unknown) {
       for (const callback of hooks.get(name) || [])
-        callback(payload)
+        await callback(payload)
     },
   }
 }
@@ -44,8 +50,28 @@ describe('devtools UI integration', () => {
     vi.clearAllMocks()
   })
 
-  it('defers the explorer dev server until Vite is serving', () => {
-    vi.mocked(existsSync).mockImplementation(path => path === '/repo/packages/explorer')
+  it('keeps the host usable when emitted client metadata is incompatible', async () => {
+    const warn = vi.spyOn(consola, 'warn').mockImplementation(() => undefined)
+    try {
+      vi.mocked(existsSync).mockReturnValue(true)
+      vi.mocked(createExplorerClientMiddleware).mockRejectedValueOnce(new Error('Unsupported fixture manifest'))
+      const { nuxt, callHook } = createNuxtHarness()
+      setupDevToolsUI(nuxt, { resolve: (path: string) => path } as any)
+      const middlewareUse = vi.fn()
+      await expect(callHook('vite:serverCreated', { middlewares: { use: middlewareUse } })).resolves.toBeUndefined()
+      const response = { statusCode: 0, setHeader: vi.fn(), end: vi.fn() }
+      middlewareUse.mock.calls[0]![1]({}, response)
+      expect(response.statusCode).toBe(503)
+      expect(warn).toHaveBeenCalledOnce()
+      expect(startSubprocess).not.toHaveBeenCalled()
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('defers the explorer dev server until Vite is serving', async () => {
+    vi.mocked(existsSync).mockImplementation(path => path === '/repo/packages/explorer' || path === './module.ts')
 
     const resolver = {
       resolve: vi.fn((path: string) => {
@@ -62,7 +88,7 @@ describe('devtools UI integration', () => {
 
     expect(startSubprocess).not.toHaveBeenCalled()
     const middlewareUse = vi.fn()
-    callHook('vite:serverCreated', { middlewares: { use: middlewareUse } })
+    await callHook('vite:serverCreated', { middlewares: { use: middlewareUse } })
     expect(middlewareUse).toHaveBeenCalledWith(DEVTOOLS_UI_ROUTE, expect.any(Function))
 
     expect(startSubprocess).toHaveBeenCalledTimes(1)
@@ -80,5 +106,38 @@ describe('devtools UI integration', () => {
         name: 'ODX Explorer Dev',
       },
     )
+  })
+
+  it('mounts an emitted client under the application base without launching a child server', async () => {
+    vi.mocked(existsSync).mockImplementation(path => String(path).startsWith('/installed/client/'))
+    const resolver = { resolve: (path: string) => path === './client' ? '/installed/client' : path } as any
+    const { nuxt, callHook } = createNuxtHarness()
+    nuxt.options.app = { baseURL: '/console/' }
+    setupDevToolsUI(nuxt, resolver)
+    const middlewareUse = vi.fn()
+    await callHook('vite:serverCreated', { middlewares: { use: middlewareUse } })
+    expect(createExplorerClientMiddleware).toHaveBeenCalledWith('/installed/client', {
+      baseURL: '/console/__odx__/client/',
+      apiBase: '/console',
+    })
+    expect(middlewareUse).toHaveBeenCalledWith('/console/__odx__/client', expect.any(Function))
+    expect(startSubprocess).not.toHaveBeenCalled()
+    const tabs: unknown[] = []
+    await callHook('devtools:customTabs', tabs)
+    expect(tabs).toEqual([expect.objectContaining({ view: { type: 'iframe', src: '/console/__odx__/client/' } })])
+  })
+
+  it('reports missing installed assets without falling back to a child process', async () => {
+    vi.mocked(existsSync).mockReturnValue(false)
+    const resolver = { resolve: (path: string) => path } as any
+    const { nuxt, callHook } = createNuxtHarness()
+    setupDevToolsUI(nuxt, resolver)
+    const middlewareUse = vi.fn()
+    await callHook('vite:serverCreated', { middlewares: { use: middlewareUse } })
+    const response = { statusCode: 0, setHeader: vi.fn(), end: vi.fn() }
+    middlewareUse.mock.calls[0]![1]({}, response)
+    expect(response.statusCode).toBe(503)
+    expect(response.end).toHaveBeenCalledWith(expect.stringContaining('assets are missing'))
+    expect(startSubprocess).not.toHaveBeenCalled()
   })
 })

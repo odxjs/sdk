@@ -13,6 +13,7 @@
   },
   "exports": {
     ".": "./nuxt.config.ts",
+    "./client-manifest": "./dist/client/manifest.json",
     "./package.json": "./package.json"
   },
   "main": "./nuxt.config.ts",
@@ -25,6 +26,8 @@
     "components",
     "composables",
     "utils",
+    "scripts",
+    "dist/client",
     "nuxt.config.ts"
   ],
   "publishConfig": {
@@ -34,7 +37,7 @@
     "node": "^22.0.0 || ^24.0.0"
   },
   "scripts": {
-    "build": "nuxi build",
+    "build": "node scripts/build.mjs",
     "dev": "nuxi dev",
     "generate": "nuxi generate",
     "prepare": "nuxi prepare",
@@ -42,7 +45,7 @@
     "verify": "vitest run && pnpm run typecheck",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "typecheck": "nuxi typecheck",
-    "prepack": "pnpm run verify"
+    "prepack": "pnpm run build && pnpm run verify"
   },
   "peerDependencies": {
     "nuxt": "^4.4.8",
