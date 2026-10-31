@@ -1,7 +1,9 @@
 import type { onDevtoolsReady } from '@nuxt/devtools-kit'
 import type { Buffer } from 'node:buffer'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { setTimeout } from 'node:timers/promises'
 import { stripVTControlCharacters } from 'node:util'
@@ -17,6 +19,9 @@ interface ContributorRun {
   session?: TerminalSession
   task?: Promise<string>
   removal?: Promise<void>
+  termination?: Promise<void>
+  ready?: boolean
+  cancelled?: boolean
 }
 
 export interface ExplorerContributor {
@@ -35,8 +40,11 @@ export function createExplorerContributor(options: {
   onStopped: () => void
 }): ExplorerContributor {
   let active: ContributorRun | undefined
+  let failedRun: ContributorRun | undefined
   let stopping: Promise<void> | undefined
   let disposed = false
+  let workspace: Promise<string> | undefined
+  const temporaryParent = resolve(tmpdir())
 
   function hasEnded(run: ContributorRun): boolean {
     const session = run.session
@@ -52,7 +60,7 @@ export function createExplorerContributor(options: {
       return Promise.resolve()
     return run.removal ||= (async () => {
       try {
-        await session.terminate()
+        await terminate(run)
       }
       finally {
         run.owner.terminals.remove(session)
@@ -60,11 +68,26 @@ export function createExplorerContributor(options: {
     })()
   }
 
+  function terminate(run: ContributorRun): Promise<void> {
+    return run.termination ||= Promise.resolve(run.session?.terminate()).then(() => undefined)
+  }
+
+  async function removeFailed(): Promise<void> {
+    const run = failedRun
+    if (!run)
+      return
+    await remove(run)
+    if (failedRun === run)
+      failedRun = undefined
+  }
+
   async function launch(run: ContributorRun): Promise<string> {
     const signal = AbortSignal.any([run.abort.signal, AbortSignal.timeout(120_000)])
     try {
       const require = createRequire(join(options.directory, 'package.json'))
       const cli = join(dirname(require.resolve('nuxt/package.json')), 'bin', 'nuxt.mjs')
+      const buildDirectory = await (workspace ||= mkdtemp(join(temporaryParent, 'odx-explorer-dev-')))
+      signal.throwIfAborted()
       run.session = await run.owner.terminals.startChildProcess({
         command: process.execPath,
         args: [cli, 'dev', '--host', '127.0.0.1', '--port', '0'],
@@ -72,6 +95,11 @@ export function createExplorerContributor(options: {
         env: {
           NUXT_TELEMETRY_DISABLED: '1',
           NUXT_APP_BASE_URL: options.baseURL,
+          // The host mount may itself begin with /_nuxt/. Give this child a
+          // distinct asset prefix so Nuxt's asset-only 404 guard does not
+          // reject the child's application document before Nitro renders it.
+          NUXT_APP_BUILD_ASSETS_DIR: '/_odx_assets/',
+          ODX_EXPLORER_BUILD_DIR: buildDirectory,
           ODX_EXPLORER_CLIENT_BASE: options.baseURL,
           NUXT_PUBLIC_ODX_API_BASE: options.apiBase,
           ODX_API_BASE: options.apiBase,
@@ -87,10 +115,10 @@ export function createExplorerContributor(options: {
       const session = run.session
       const onExit = async (error: unknown): Promise<void> => {
         run.abort.abort(error)
-        if (active !== run)
+        if (active !== run || !run.ready)
           return
         try {
-          await stop()
+          await stop(true)
         }
         finally {
           if (!disposed && !active)
@@ -120,13 +148,22 @@ export function createExplorerContributor(options: {
         await setTimeout(100, undefined, { signal })
       }
       run.abort.signal.throwIfAborted()
+      run.ready = true
       return origin
     }
     catch (error) {
       const failure = signal.aborted ? signal.reason : error
-      await remove(run)
-      if (active === run)
-        active = undefined
+      try {
+        await terminate(run)
+        if (!disposed && !run.cancelled)
+          failedRun = run
+      }
+      finally {
+        if (disposed || run.cancelled || failedRun !== run)
+          await remove(run)
+        if (active === run)
+          active = undefined
+      }
       throw failure
     }
   }
@@ -136,6 +173,8 @@ export function createExplorerContributor(options: {
       return Promise.reject(new Error('The ODX contributor host is closed.'))
     if (stopping)
       return stopping.then(start)
+    if (failedRun)
+      return removeFailed().then(start)
     if (active && hasEnded(active))
       return stop().then(start)
     if (active?.task)
@@ -149,16 +188,20 @@ export function createExplorerContributor(options: {
     return run.task
   }
 
-  function stop(): Promise<void> {
+  function stop(retainTerminal = false): Promise<void> {
     const run = active
     if (!run)
-      return stopping || Promise.resolve()
+      return (stopping || Promise.resolve()).then(removeFailed)
     active = undefined
+    run.cancelled = true
     run.abort.abort(new Error('The ODX contributor host was stopped.'))
     const task = (async () => {
       // A failed terminate must not bypass a late process-creation cleanup.
-      await Promise.allSettled([remove(run), run.task])
-      await remove(run)
+      await Promise.allSettled([retainTerminal ? terminate(run) : remove(run), run.task])
+      if (retainTerminal && !disposed)
+        failedRun = run
+      else
+        await remove(run)
     })()
     stopping = task
     void task.finally(() => {
@@ -175,6 +218,13 @@ export function createExplorerContributor(options: {
     async dispose(): Promise<void> {
       disposed = true
       await stop()
+      await removeFailed()
+      if (workspace) {
+        const owned = await workspace
+        if (dirname(resolve(owned)) !== temporaryParent)
+          throw new Error('Unexpected Explorer development workspace; cleanup refused.')
+        await rm(owned, { recursive: true, force: true })
+      }
     },
   }
 }

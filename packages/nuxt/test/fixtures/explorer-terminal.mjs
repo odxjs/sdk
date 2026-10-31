@@ -11,7 +11,7 @@ const server = createServer((request, response) => {
   }
   else if (request.url === `${base}status`) {
     response.setHeader('Content-Type', 'application/json')
-    response.end(JSON.stringify({ pid: process.pid, base, apiBase: process.env.NUXT_PUBLIC_ODX_API_BASE, legacyTarget: process.env.ODX_EXPLORER_API_PROXY_TARGET }))
+    response.end(JSON.stringify({ pid: process.pid, base, assetsDir: process.env.NUXT_APP_BUILD_ASSETS_DIR, apiBase: process.env.NUXT_PUBLIC_ODX_API_BASE, legacyTarget: process.env.ODX_EXPLORER_API_PROXY_TARGET }))
   }
   else {
     response.statusCode = 503

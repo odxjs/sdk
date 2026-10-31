@@ -47,6 +47,7 @@ export function setupDevToolsUI(nuxt: Nuxt, resolver: Resolver): void {
   let launchCommand: ReturnType<ExplorerDevtoolsContext['commands']['register']> | undefined
   let clientOrigin: string | undefined
   let clientGeneration = 0
+  let startViewGeneration = 0
   const contributor = isContributor
     ? createExplorerContributor({
         directory: explorerDirectory,
@@ -56,7 +57,7 @@ export function setupDevToolsUI(nuxt: Nuxt, resolver: Resolver): void {
         onStopped: () => {
           clientOrigin = undefined
           if (context && !disposed)
-            registerLauncher(context)
+            registerStartView(context, false)
         },
       })
     : undefined
@@ -73,15 +74,15 @@ export function setupDevToolsUI(nuxt: Nuxt, resolver: Resolver): void {
     ctx.docks.register({ ...dock, ...frame, type: 'iframe', url }, true)
   }
 
-  function registerLauncher(ctx: ExplorerDevtoolsContext): void {
+  function registerStartView(ctx: ExplorerDevtoolsContext, autoStart = true): void {
+    const scriptPath = encodeURI(resolver.resolve('./runtime/devtools/explorer-start.ts').replaceAll('\\', '/')).replaceAll('#', '%23').replaceAll('?', '%3F')
     ctx.docks.register({
       ...dock,
-      type: 'launcher',
-      launcher: {
-        title: 'Start ODX Explorer',
-        description: 'Starts the repository development client on demand. OData requests stay on this application host.',
-        command: 'odx:explorer:start',
-        terminalSessionId: 'odx:client',
+      type: 'custom-render',
+      renderer: {
+        // Each stopped process gets a fresh setup; Devframe caches scripts by
+        // descriptor. Importing this view does not run before dock activation.
+        importFrom: `${appBase}/${assetRoute}/@fs/${scriptPath}?odxStart=${++startViewGeneration}&odxAuto=${autoStart ? '1' : '0'}`,
       },
     }, true)
   }
@@ -110,9 +111,11 @@ export function setupDevToolsUI(nuxt: Nuxt, resolver: Resolver): void {
           const origin = await contributor.start()
           if (!disposed && context === ctx && contributor.current())
             registerIframe(ctx, origin)
+          else if (!disposed && context === ctx)
+            throw new Error('The ODX Explorer stopped during startup. Inspect its terminal and retry.')
         },
       })
-      registerLauncher(ctx)
+      registerStartView(ctx)
     }
     else {
       registerIframe(ctx)

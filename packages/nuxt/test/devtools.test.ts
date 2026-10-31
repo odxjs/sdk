@@ -34,6 +34,7 @@ function harness(source = false, hasAssets = true, app: { baseURL: string, build
     './client': '/installed/client',
     './module.ts': '/source/module.ts',
     '../../explorer': '/source/explorer',
+    './runtime/devtools/explorer-start.ts': '/source/runtime/devtools/explorer-start.ts',
   }[path] || path) } as any
   vi.mocked(existsSync).mockImplementation(path => source
     ? String(path) === '/source/module.ts' || String(path) === '/source/explorer'
@@ -140,19 +141,19 @@ describe('native DevTools integration', () => {
     expect(start).not.toHaveBeenCalled()
   })
 
-  it('launches on demand and restores the launcher after the process stops', async () => {
+  it('registers activation-owned startup and restores a fresh start view after the process stops', async () => {
     const { callHook } = harness(true)
     const ctx = { docks: { register: vi.fn() }, commands: { register: vi.fn((_command: { handler: () => Promise<void> }) => ({ unregister: vi.fn() })) } }
     await callHook('devtools:ready', ctx)
     const launcher = ctx.docks.register.mock.calls[0]![0]
-    expect(launcher.type).toBe('launcher')
+    expect(launcher.type).toBe('custom-render')
     expect(start).not.toHaveBeenCalled()
-    expect(JSON.parse(JSON.stringify(launcher)).launcher.command).toBe('odx:explorer:start')
+    expect(JSON.parse(JSON.stringify(launcher)).renderer.importFrom).toBe('/console/_nuxt/@fs//source/runtime/devtools/explorer-start.ts?odxStart=1&odxAuto=1')
     await ctx.commands.register.mock.calls[0]![0].handler()
     expect(start).toHaveBeenCalledOnce()
     expect(ctx.docks.register).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'iframe', url: '/console/_nuxt/odx-explorer/?odxInstance=1' }), true)
     createContributor.mock.calls[0]![0].onStopped()
-    expect(ctx.docks.register).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'launcher' }), true)
+    expect(ctx.docks.register).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'custom-render', renderer: expect.objectContaining({ importFrom: expect.stringContaining('?odxStart=2') }) }), true)
     await ctx.commands.register.mock.calls[0]![0].handler()
     expect(ctx.docks.register).toHaveBeenLastCalledWith(expect.objectContaining({
       type: 'iframe',
@@ -265,12 +266,12 @@ describe('native DevTools integration', () => {
     expect(start).not.toHaveBeenCalled()
   })
 
-  it('keeps the launcher if a process exits before its iframe can be registered', async () => {
+  it('reports a process exiting before its iframe can be registered', async () => {
     const { callHook } = harness(true)
     const ctx = { docks: { register: vi.fn() }, commands: { register: vi.fn((_command: { handler: () => Promise<void> }) => ({ unregister: vi.fn() })) } }
     await callHook('devtools:ready', ctx)
     start.mockResolvedValueOnce('http://127.0.0.1:45678')
-    await ctx.commands.register.mock.calls[0]![0].handler()
+    await expect(ctx.commands.register.mock.calls[0]![0].handler()).rejects.toThrow('stopped during startup')
     expect(ctx.docks.register).toHaveBeenCalledOnce()
   })
 })

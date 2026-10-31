@@ -1,4 +1,5 @@
 import type { ExplorerDevtoolsContext } from '../src/devtools-contributor'
+import { stat } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -59,16 +60,22 @@ describe('contributor native terminal lifecycle', () => {
       secondOrigin = await b.controller.start()
       expect(firstOrigin).not.toBe(secondOrigin)
       expect(first.spawn).toHaveBeenCalledOnce()
+      const firstBuildDir = first.spawn.mock.calls[0]![0].env.ODX_EXPLORER_BUILD_DIR
+      const secondBuildDir = second.spawn.mock.calls[0]![0].env.ODX_EXPLORER_BUILD_DIR
+      expect(firstBuildDir).not.toBe(secondBuildDir)
+      expect((await stat(firstBuildDir)).isDirectory()).toBe(true)
       expect(first.spawn.mock.calls[0]![0].args.slice(-2)).toEqual(['--port', '0'])
       expect(first.spawn.mock.calls[0]![1].restartable).toBe(false)
       expect(first.native.sessions.size).toBe(1)
       const state = await fetch(`${firstOrigin}/console/__odx__/client/status`).then(response => response.json())
-      expect(state).toMatchObject({ base: '/console/__odx__/client/', apiBase: '/console', legacyTarget: '' })
+      expect(state).toMatchObject({ base: '/console/__odx__/client/', assetsDir: '/_odx_assets/', apiBase: '/console', legacyTarget: '' })
       await a.controller.dispose()
       await b.controller.dispose()
       expect(a.controller.current()).toBeUndefined()
       expect(first.native.sessions.size).toBe(0)
       expect(second.native.sessions.size).toBe(0)
+      await expect(stat(firstBuildDir)).rejects.toMatchObject({ code: 'ENOENT' })
+      await expect(stat(secondBuildDir)).rejects.toMatchObject({ code: 'ENOENT' })
       await expect(fetch(firstOrigin)).rejects.toThrow()
       await expect(fetch(secondOrigin)).rejects.toThrow()
       await expect(a.controller.start()).rejects.toThrow('closed')
@@ -106,17 +113,28 @@ describe('contributor native terminal lifecycle', () => {
     }
   })
 
-  it('rejects promptly when a process exits after announcing its port but before readiness', async () => {
+  it('keeps failed startup output without triggering an automatic restart, and replaces it on explicit retry', async () => {
     const host = nativeHost({ ODX_TEST_EXIT_AFTER_ANNOUNCE: '1', ODX_TEST_READY_DELAY_MS: '10000' })
-    const { controller } = contributor(host)
+    const { controller, onStopped } = contributor(host)
     try {
       await expect(controller.start()).rejects.toThrow(/exited/)
-      await expect.poll(() => host.native.sessions.size).toBe(0)
+      expect(host.native.sessions.size).toBe(1)
+      const failed = host.native.sessions.get('odx:client')!
+      expect(failed.status).not.toBe('running')
+      expect(onStopped).not.toHaveBeenCalled()
+      expect(host.spawn).toHaveBeenCalledOnce()
+      expect(controller.current()).toBeUndefined()
+      await expect(controller.start()).rejects.toThrow(/exited/)
+      expect(host.spawn).toHaveBeenCalledTimes(2)
+      expect(host.native.sessions.size).toBe(1)
+      expect(host.spawn.mock.calls[1]![0].env.ODX_EXPLORER_BUILD_DIR).toBe(host.spawn.mock.calls[0]![0].env.ODX_EXPLORER_BUILD_DIR)
+      expect(host.native.sessions.get('odx:client')).not.toBe(failed)
     }
     finally {
       await controller.dispose()
       await cleanup(host)
     }
+    expect(host.native.sessions.size).toBe(0)
   })
 
   it('restores launch availability after native termination and starts a fresh session', async () => {
@@ -136,12 +154,15 @@ describe('contributor native terminal lifecycle', () => {
     }
   })
 
-  it('rejects an invalid announced port without waiting for readiness and reaps its process', async () => {
+  it('rejects an invalid announced port, reaps its process and retains diagnostics until stopped', async () => {
     const host = nativeHost({ ODX_TEST_ANNOUNCE_PORT: '99999' })
     const { controller } = contributor(host)
     try {
       await expect(controller.start()).rejects.toThrow('invalid loopback port')
-      await expect.poll(() => host.native.sessions.size).toBe(0)
+      expect(host.native.sessions.size).toBe(1)
+      expect(host.native.sessions.get('odx:client')!.status).not.toBe('running')
+      await controller.stop()
+      expect(host.native.sessions.size).toBe(0)
     }
     finally {
       await controller.dispose()
