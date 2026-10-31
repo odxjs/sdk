@@ -10,8 +10,10 @@ proxy runtime contracts.
 The supported Nuxt host floor is 4.6.3, with Nuxt DevTools 4 selected explicitly
 by the application (see its official v4 upgrade guide). The Explorer appears
 under **Nuxt → ODX** as a native iframe dock. Installed packages serve the
-verified client without spawning another server. Repository source hosts use
-the native **Start** launcher and terminal lifecycle with allocated ports.
+verified client without spawning another server. In repository source hosts,
+opening ODX starts its development client automatically, with status, terminal
+access and explicit Retry on failure. Each host owns its allocated port and
+temporary Nuxt/Vite cache, reused for restarts and removed on host close.
 The v3 custom-tab integration is not retained in this unpublished release.
 Disabling ODX DevTools or building production registers neither dock nor client.
 

@@ -218,14 +218,22 @@ Explorer has three delivery modes:
 - An installed Nuxt module serves its verified, prerendered Explorer client at
   `<appBase>/__odx__/client/`. Native DevTools v4 registers one iframe in the
   Nuxt group. No separate UI process or Explorer runtime dependency is needed.
-- A repository source host exposes a native launcher instead. Its authenticated
-  host command starts one terminal-owned Nuxt client on an allocated loopback
+- A repository source host exposes an activation-owned start view instead. Its
+  first opening invokes an authenticated host command, starting one
+  terminal-owned Nuxt client on an allocated loopback
   port. HTTP and HMR are proxied under
   `<appBase>/<buildAssetsDir>/odx-explorer/`, within Nuxt's Vite upgrade namespace.
   OData/config/log requests keep the host's app base and existing authorization.
   The frontend proxy strips host cookies and Authorization before forwarding to
   the child. Closing the host or replacing its DevTools context disposes the
-  owned process; termination restores the launcher. HTTP requests cannot start
+  owned process. Each host owns isolated temporary Nuxt/Vite build outputs;
+  client restarts reuse them, host disposal removes them. The child has a
+  distinct internal asset prefix so the root application document is not
+  rejected by Nuxt's asset-only 404 guard. Failed starts retain terminal output
+  and require explicit Retry, preventing automatic restart loops. After native
+  termination, reopening ODX offers explicit Retry. The cached bootstrap keeps
+  its recovery controls across iframe handoffs; it does not automatically undo
+  a deliberate process termination. HTTP requests cannot start
   a process. Missing installed assets return 503 rather than launching source.
 - In SAP BTP production deployments, it is a standalone Nitro-built browser app
   served by the `odx-explorer` module behind the AppRouter. AppRouter routes

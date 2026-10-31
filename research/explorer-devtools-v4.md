@@ -10,6 +10,59 @@ source.
 
 ## Implementation progress
 
+### E3: first-open startup and root-host recovery (2026-10-31)
+
+The ordinary `localhost` host with application base `/` exposed a gap in the
+earlier nested-base probe: the Explorer process announced Ready, but its
+`/_nuxt/odx-explorer/` document returned HTTP 404. Nuxt's Vite middleware treats
+the child's own default asset prefix as asset-only and rejects this document.
+The child now uses a distinct internal `/_odx_assets/` prefix. Its parent mount
+still belongs to the parent's Vite namespace, preserving HTTP and HMR ownership.
+Readiness requires an actual successful Nuxt document, not terminal output.
+
+Opening the native ODX dock now mounts a small custom-render bootstrap and
+invokes the existing authenticated start command automatically. Ordinary host
+requests do not start another process. The bootstrap has no runtime package
+imports, so activating it cannot trigger dependency discovery in the parent.
+It uses public panel/command APIs and covers the pinned Hub UI's mount ordering
+with a bounded animation-frame wait. Hub UI retains custom panes through an
+iframe handoff; their recovery controls remain usable when returning from an
+intentionally stopped client. Explicit stop and failed startup require Retry.
+
+Opus identified a possible automatic failure loop and disappearing diagnostics.
+Only a previously ready process restores the stopped dock on exit; a failed
+first start retains one terminated terminal and exposes a safe error and Retry.
+Retry replaces that retained session. Closing the host disposes its processes
+and only its allocated temporary Nuxt/Vite directory. Independent hosts use
+independent directories; child restarts reuse their host's directory.
+
+Cold source navigation also revealed late optimizer discovery of graph
+dependencies, which reloaded the client, and hundreds of deep Reka UI requests
+that could exhaust Chromium's request buffers. Source development prebundles
+the optional graph dependencies and `@nuxt/ui > reka-ui`. The latter removes
+only Reka's client optimization exclusion; server transpilation remains intact.
+The graph itself still mounts only on Schema intent. These are development
+dependency changes, not a production renderer rewrite or a latency guarantee.
+
+The final root/localhost and nested-base Chromium journeys pass on the same
+Explorer source fingerprint. They exercise first opening without a Start click,
+Data, painted Schema, Logs, Proxy, same-origin requests, HMR, hidden polling,
+intentional terminal termination and a fresh client after Retry. The nested
+journey additionally runs an actual failing child first, inspects retained
+terminal output and retries. Both hosts close gracefully without fallback.
+The focused activation/process suite passes 26 cases; changed-file lint and
+root/Explorer typechecks pass. Evidence lives in the local baseline artifact
+directory under `autostart-root-verified`, `autostart-nested-verified` and
+`autostart-unit-final.json`. The original Ready-plus-404 proof is preserved in
+`autostart-root-probe`. The fresh static build and outside-workspace tarball
+consumer also pass, including browser data use, deep reload, dependency/import
+boundaries and production exclusion. The first consumer probe exposed a runner
+defect: Nitro interpreted port zero as its default, colliding with an occupied
+port 3000. The runner now discovers an available loopback port; the complete
+fresh rerun passes in `installed-consumer-autostart-final/receipt.json`. The
+failed first receipt remains preserved. This is not a claim of full root
+verification or real SAP/BTP acceptance.
+
 ### D1: metadata-owned record mutations
 
 The editor now captures the original service, entity, typed key, method and
@@ -287,7 +340,9 @@ the upgraded layer/toolchain; a v3 custom-tab shim is deliberately not retained.
 Framework-neutral transport packages keep their independent runtime floors.
 
 Installed modules register the shipped static iframe and start no child.
-Only a repository launcher command can start a source client; a GET/WS cannot.
+Only the authenticated repository start command can start a source client;
+first dock activation now invokes it automatically (E3 above), whereas a
+GET/WS cannot.
 Ports come from the actual Nuxt listener announcement, and native termination,
 context replacement and Nuxt close own cleanup. Source HTTP/HMR mount under
 the host's Vite asset namespace, while OData/config/log calls keep the host's

@@ -37,11 +37,14 @@ pnpm run docs:api
 
 Open Nuxt DevTools v4 and choose **Nuxt → ODX**. An installed module serves its
 bundled Explorer at `<appBase>/__odx__/client/` without starting another process.
-In a repository source host, choose **Start** to launch the development client
-on an allocated port. Its iframe and HMR use the host's Vite asset mount, for
+In a repository source host, opening **ODX** starts the development client
+automatically on an allocated port. A status view offers terminal access;
+failed starts show **Retry** and retain their terminal output until the next
+attempt or host close. Its iframe and HMR use the host's Vite asset mount, for
 example `/console/_nuxt/odx-explorer/`. Business requests remain on the host.
-The running client appears in native Terminals; terminating it restores the
-launcher, and closing the host closes its owned client. Nuxt DevTools' normal
+The running client appears in native Terminals; after explicitly terminating
+it, reopen ODX and choose **Retry** to start a fresh client. Each host owns a temporary build/cache directory,
+reused for its client restarts and removed when the host closes. Nuxt DevTools' normal
 local authorization remains enabled. No fixed port 3300 is reserved by this
 integration; standalone Explorer development can still use its own default.
 
@@ -56,6 +59,10 @@ This starts owned local hosts and Chromium against synthetic OData. It exercises
 local authorization, native launch, data/schema/log/proxy navigation, same-origin
 HMR, termination and relaunch. Receipts and screenshots go to the ignored
 `.artifacts/explorer-native-host/`; no code or authorization token is persisted.
+Pass an output directory followed by `--root-base` to exercise the ordinary
+localhost/root host, or `--fail-first` to inject one child-process failure and
+check retained terminal diagnostics plus explicit Retry. The default uses a
+nested app base and an explicit loopback host. Neither path clicks a launcher.
 
 Local Explorer endpoints are optimized for developer feedback. They can expose
 resolved config, local generated types, raw metadata XML, and in-memory traffic

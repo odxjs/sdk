@@ -33,8 +33,9 @@ The same state and layer tests also run from the workspace root:
 pnpm exec vitest run packages/explorer/test
 ```
 
-The repository build emits both the existing standalone Node application and
-a static client under `dist/client`. The exported `./client-manifest` records
+The package build emits a static client under `dist/client`; the separate
+deployment build runs `nuxi build` for the standalone Node application.
+The exported `./client-manifest` records
 the package version, source and lockfile fingerprints, build identity and exact
 file hashes. Its icons are bundled locally; the installed Nuxt-module client
 does not require an icon API. The Nuxt package copies this client at build time
@@ -162,6 +163,8 @@ fail closed. The direct bridge retains its documented policy boundaries.
 The graph mounts on the first Schema selection and retains its viewport while
 switching back to Data. It does not create hidden graph nodes or request graph
 metadata before that first selection. Nuxt may prefetch the async chunk earlier.
+Its development dependencies are prebundled at startup so opening Schema does
+not cause an optimizer reload that discards the current service selection.
 A failed chunk load shows an explicit error; **Reload Explorer** refreshes the
 tool document and its module map without navigating the business application.
 
