@@ -6,6 +6,7 @@ import { execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
+import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import process from 'node:process'
@@ -90,13 +91,27 @@ async function main(): Promise<void> {
   }
 
   async function startHost(cli: string, production = false): Promise<string> {
+    // Nitro treats zero as its default port. Discover an available loopback
+    // port for the production process instead of colliding with a user's dev host.
+    let productionPort = '0'
+    if (production) {
+      const reservation = createServer()
+      await new Promise<void>((resolve, reject) => {
+        reservation.once('error', reject)
+        reservation.listen(0, '127.0.0.1', resolve)
+      })
+      const address = reservation.address()
+      assert(address && typeof address === 'object')
+      productionPort = String(address.port)
+      await new Promise<void>((resolve, reject) => reservation.close(error => error ? reject(error) : resolve()))
+    }
     const args = production ? [] : ['dev', '--host', '127.0.0.1', '--port', '0']
     child = spawn(process.execPath, [cli, ...args], {
       cwd: directory,
       windowsHide: true,
       detached: process.platform !== 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, CI: '1', NODE_ENV: production ? 'production' : 'development', NUXT_TELEMETRY_DISABLED: '1', NITRO_HOST: '127.0.0.1', NITRO_PORT: '0', PORT: '0' },
+      env: { ...process.env, CI: '1', NODE_ENV: production ? 'production' : 'development', NUXT_TELEMETRY_DISABLED: '1', NITRO_HOST: '127.0.0.1', NITRO_PORT: productionPort, PORT: productionPort },
     })
     childClosed = new Promise(resolve => child!.once('close', () => resolve()))
     return new Promise((resolve, reject) => {
