@@ -50,8 +50,8 @@ export default defineNuxtConfig({
   compatibilityDate: 'latest',
   site: {
     ...(siteUrl ? { url: siteUrl } : {}),
-    name: 'ODX',
-    description: 'Modern OData Developer Experience for Nuxt and SAP BTP',
+    name: 'ODX.js SDK',
+    description: 'Connect to and inspect OData services with ODX SDK and Explorer',
   },
   ...(siteUrl ? { llms: { domain: siteUrl } } : {}),
   odata: {

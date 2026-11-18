@@ -1,5 +1,5 @@
 ---
-title: ODX - Modern OData Developer Experience
+title: ODX.js SDK and Explorer
 description: ODX is a modular, framework-agnostic toolkit that bridges modern TypeScript web apps and OData V2 / V4 services with first-class support for SAP.
 navigation: false
 aside: false
@@ -7,10 +7,10 @@ aside: false
 
 ::landing-hero
 ---
-headline: OData Developer Experience
+headline: ODX.js SDK
 title: Modern OData Developer Experience
 description: ODX turns service metadata into typed clients, safer backend access, and a clearer development loop.
-explorer: "Explorer 0.4: schema graph and live proxy tap"
+explorer: "Explorer: schema, entity data, and proxy traffic"
 getStarted: Get started
 getStartedTo: /en/ecosystem/introduction
 githubLabel: GitHub

@@ -33,12 +33,12 @@ export default defineAppConfig({
     locale: 'en',
   },
   seo: {
-    title: 'ODX',
-    titleTemplate: '%s ? ODX',
-    description: 'OData Developer Experience: The modern ecosystem for OData integration.',
+    title: 'ODX.js SDK',
+    titleTemplate: '%s | ODX.js SDK',
+    description: 'Guides and reference for connecting to OData and inspecting services with ODX Explorer.',
   },
   header: {
-    title: 'ODX',
+    title: 'ODX.js SDK',
   },
   socials: {
     github: 'odxjs/sdk',

@@ -1,11 +1,12 @@
-# ODX: OData Developer Experience
+# ODX.js SDK and Explorer
 
 [![Nuxt](https://img.shields.io/badge/Nuxt-4-green.svg)](https://nuxt.com)
 
-A powerful ecosystem for seamless, type-safe integration with OData services. It provides a robust server-side proxy, automated TypeScript model generation, and a high-fidelity DevTools UI for exploration.
+ODX.js brings together the ODX SDK, ODX Explorer, and ODX UI. This repository contains the SDK and Explorer. The SDK connects applications to OData services through generated TypeScript clients and a server-side proxy. Explorer lets developers inspect schemas, entity data, and proxy traffic. ODX UI builds metadata-driven application behavior on those contracts.
 
-Documentation is maintained in this repository while the public documentation
-site is not yet live.
+SDK and Explorer reference guides are in [this repository](./docs/content/en).
+The shared ODX.js entry point, interactive examples, and product roadmap are
+maintained in the [ODX UI documentation](https://github.com/odxjs/ui/tree/main/apps/docs).
 
 ODX works with any standard OData V2/V4 endpoint. Additionally, it comes with first-class support for SAP systems out of the box (handling NetWeaver routing, basic auth, and automated CSRF-Token pre-fetching).
 
