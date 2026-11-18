@@ -4231,6 +4231,38 @@
       }
     ]
   },
+  "ODataExplorerHostCapabilities": {
+    "title": "ODataExplorerHostCapabilities",
+    "properties": [
+      {
+        "name": "metadataRefresh",
+        "type": "boolean",
+        "required": true
+      },
+      {
+        "name": "sdkGeneration",
+        "type": "boolean",
+        "required": true
+      },
+      {
+        "name": "generatedTypes",
+        "type": "boolean",
+        "description": "Whether this host exposes the development-only generated-types endpoint.",
+        "required": true
+      }
+    ]
+  },
+  "ODataExplorerServiceCapabilities": {
+    "title": "ODataExplorerServiceCapabilities",
+    "properties": [
+      {
+        "name": "dataMethods",
+        "type": "string[]",
+        "description": "Static method restrictions only; server hooks/auth/backend still decide.",
+        "required": true
+      }
+    ]
+  },
   "ODataExplorerServiceInfo": {
     "title": "ODataExplorerServiceInfo",
     "properties": [
@@ -4277,6 +4309,11 @@
       {
         "name": "metadata",
         "type": "ODataExplorerMetadataState | undefined",
+        "required": false
+      },
+      {
+        "name": "capabilities",
+        "type": "ODataExplorerServiceCapabilities | undefined",
         "required": false
       }
     ]
@@ -4331,6 +4368,42 @@
       }
     ]
   },
+  "ODataExplorerGenerationFailure": {
+    "title": "ODataExplorerGenerationFailure",
+    "description": "SDK generation failed after the metadata refresh operation completed.",
+    "properties": [
+      {
+        "name": "success",
+        "type": "false",
+        "required": true
+      },
+      {
+        "name": "operation",
+        "type": "\"sdk-generation\"",
+        "required": true
+      },
+      {
+        "name": "generated",
+        "type": "false",
+        "required": true
+      },
+      {
+        "name": "metadataRefreshed",
+        "type": "true",
+        "required": true
+      },
+      {
+        "name": "service",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "error",
+        "type": "string",
+        "required": true
+      }
+    ]
+  },
   "ODataExplorerConfigResponse": {
     "title": "ODataExplorerConfigResponse",
     "properties": [
@@ -4348,6 +4421,11 @@
         "name": "services",
         "type": "ODataExplorerServiceInfo[]",
         "required": true
+      },
+      {
+        "name": "capabilities",
+        "type": "ODataExplorerHostCapabilities | undefined",
+        "required": false
       },
       {
         "name": "forwardAuthHeader",
