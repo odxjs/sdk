@@ -66,7 +66,8 @@ try {
   const previous = await readFile(new URL('manifest.json', clientDir), 'utf8').then(JSON.parse).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error))
   if (!previous && await stat(clientDir).then(() => true).catch(error => error.code === 'ENOENT' ? false : Promise.reject(error)))
     throw new Error('Refusing to overwrite an Explorer client directory without a generated manifest.')
-  if (previous && (previous.formatVersion !== 1 || previous.packageName !== manifest.name))
+  // Existing checkouts may still hold a generated client from before the scope change.
+  if (previous && (previous.formatVersion !== 1 || ![manifest.name, '@me-tools/odx-explorer'].includes(previous.packageName)))
     throw new Error('Refusing to replace an unrecognized Explorer client directory.')
   await mkdir(join(rootDir, 'dist'), { recursive: true })
   const staging = await mkdtemp(join(rootDir, 'dist', '.client-'))
@@ -82,6 +83,10 @@ try {
   finally {
     await rm(staging, { recursive: true, force: true })
   }
+}
+catch (error) {
+  console.error(error)
+  process.exitCode = 1
 }
 finally {
   // Delete only the temporary directory allocated above; never follow a
