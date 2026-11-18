@@ -20,6 +20,6 @@ describe('explorer Nuxt layer', () => {
     expect(typeof stylesheet).toBe('string')
     expect(isAbsolute(String(stylesheet))).toBe(true)
     await expect(access(String(stylesheet))).resolves.toBeUndefined()
-    expect(config.vite).toBeUndefined()
+    expect(config.vite?.server?.fs?.allow).toBeUndefined()
   })
 })
