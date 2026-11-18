@@ -1,5 +1,5 @@
-import type { EntityMapping, ODataProxyConfig, ODataServiceConfig } from '@odxjs/core'
 import type { Nuxt } from '@nuxt/schema'
+import type { EntityMapping, ODataProxyConfig, ODataServiceConfig } from '@odxjs/core'
 import { Buffer } from 'node:buffer'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'

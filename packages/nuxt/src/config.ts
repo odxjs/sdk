@@ -1,10 +1,10 @@
 import type { ModuleOptions, ODataProxyConfig, ODataPublicConfig, ODataServiceConfig } from '@odxjs/core'
 import process from 'node:process'
+import { useLogger } from '@nuxt/kit'
 import {
   normalizeODataProxyBasePath,
   normalizeODataServiceRoutes,
 } from '@odxjs/proxy'
-import { useLogger } from '@nuxt/kit'
 import { parseSafeHttpServiceUrl } from './service-url'
 
 const RE_UNDERSCORE = /_/g
