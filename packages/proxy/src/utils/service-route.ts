@@ -1,4 +1,4 @@
-import type { ODataServiceConfig } from '@me-tools/odx-core'
+import type { ODataServiceConfig } from '@odxjs/core'
 
 const RE_BOUNDARY_SLASHES = /^\/+|\/+$/g
 const RE_PATH_SEPARATOR = /[\\/]/u

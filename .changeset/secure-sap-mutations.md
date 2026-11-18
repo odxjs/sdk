@@ -1,7 +1,7 @@
 ---
-'@me-tools/odx-core': minor
-'@me-tools/odx-proxy': minor
-'@me-tools/odx-nuxt': minor
+'@odxjs/core': minor
+'@odxjs/proxy': minor
+'@odxjs/nuxt': minor
 ---
 
 Add a production-safe SAP CSRF mutation contract for proxied services. Token

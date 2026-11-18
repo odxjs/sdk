@@ -30,7 +30,7 @@ Optional routing and behavior:
 ## Strategy
 
 `proxied` means browser and app requests go through Nitro and
-`@me-tools/odx-proxy`. Use it for private services, SAP BTP destinations,
+`@odxjs/proxy`. Use it for private services, SAP BTP destinations,
 authentication, policy enforcement, and telemetry.
 
 `direct` means the service can be addressed directly by the browser or tooling.
@@ -63,7 +63,7 @@ from `$metadata`.
 ## CSDL Document
 
 A CSDL document is the loss-aware XML or JSON representation produced by
-`@me-tools/odx-metadata`. It contains source identity, OData version evidence,
+`@odxjs/metadata`. It contains source identity, OData version evidence,
 ordered raw nodes, stable node IDs, provenance ranges when available, a shallow
 schema index, and diagnostics.
 
@@ -142,7 +142,7 @@ state belongs to the consuming controller.
 
 ## Generated Registry
 
-The generated ODX registry augments `ODataServiceRegistry` in `@me-tools/odx-core`.
+The generated ODX registry augments `ODataServiceRegistry` in `@odxjs/core`.
 That registry powers IDE autocomplete for:
 
 - service names

@@ -1,4 +1,4 @@
-import type { EntityMapping, ODataProxyConfig, ODataServiceConfig } from '@me-tools/odx-core'
+import type { EntityMapping, ODataProxyConfig, ODataServiceConfig } from '@odxjs/core'
 import type { Nuxt } from '@nuxt/schema'
 import { Buffer } from 'node:buffer'
 import { execFileSync } from 'node:child_process'
@@ -9,14 +9,14 @@ import https from 'node:https'
 import { createRequire } from 'node:module'
 import process from 'node:process'
 import { StringDecoder } from 'node:string_decoder'
-import { mergeHeaders } from '@me-tools/odx-core'
-import { extractEntitiesFromCsdlDocument } from '@me-tools/odx-core/server'
-import { parseCsdl } from '@me-tools/odx-metadata'
+import { mergeHeaders } from '@odxjs/core'
+import { extractEntitiesFromCsdlDocument } from '@odxjs/core/server'
+import { parseCsdl } from '@odxjs/metadata'
 import { consola } from 'consola'
 import { dirname, join, resolve } from 'pathe'
 import { parseSafeHttpServiceUrl } from './service-url'
 
-const logger = consola.withTag('@me-tools/odx-nuxt')
+const logger = consola.withTag('@odxjs/nuxt')
 const METADATA_DOWNLOAD_TIMEOUT_MS = 30_000
 const METADATA_ACCEPT_HEADER = 'application/xml, text/xml, */*'
 const RESTRICTED_METADATA_HEADERS = new Set([
@@ -214,7 +214,7 @@ export function generateRegistryDts(
   serviceEntities: Record<string, EntityMapping[]>,
   serviceModelFiles: Record<string, string>,
 ): string {
-  const indexDtsLines = ['import type { ODataRuntimeService, ODataServiceRegistry } from "@me-tools/odx-core"']
+  const indexDtsLines = ['import type { ODataRuntimeService, ODataServiceRegistry } from "@odxjs/core"']
   const serviceModelAliases: Record<string, string> = {}
 
   for (const [svcName, modelFile] of Object.entries(serviceModelFiles)) {
@@ -223,7 +223,7 @@ export function generateRegistryDts(
     indexDtsLines.push(`import * as ${modelAlias} from "./${svcName}/${modelFile}"`)
   }
 
-  indexDtsLines.push('\ndeclare module "@me-tools/odx-core" {')
+  indexDtsLines.push('\ndeclare module "@odxjs/core" {')
   indexDtsLines.push('  interface ODataServiceRegistry {')
   for (const [svcName, entities] of Object.entries(serviceEntities)) {
     const entityNames = entities.map(e => e.name)
@@ -337,7 +337,7 @@ export function setupTypeGeneration(nuxt: Nuxt, config: ODataProxyConfig): void 
                 fs.mkdirSync(tempDir, { recursive: true })
               fs.copyFileSync(persistentCacheFile, tempFile)
             }
-            logger.warn(`[@me-tools/odx-nuxt] Could not download metadata for ${svc.name}, using cache: ${err.message}`)
+            logger.warn(`[@odxjs/nuxt] Could not download metadata for ${svc.name}, using cache: ${err.message}`)
             inputPath = tempFile
           }
           else {

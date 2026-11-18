@@ -1,4 +1,4 @@
-# @me-tools/odx-nuxt
+# @odxjs/nuxt
 
 The official Nuxt module for the ODX ecosystem. It provides type-safe OData composables, automated SDK generation, and native DevTools integration.
 
@@ -7,7 +7,7 @@ explicit request-context-aware read and mutation services instead of rebuilding
 proxy paths or calling an upstream origin directly:
 
 ```ts
-import { createODataServerReadService } from '@me-tools/odx-nuxt/server'
+import { createODataServerReadService } from '@odxjs/nuxt/server'
 
 export default defineEventHandler(async (event) => {
   const catalog = createODataServerReadService(event, 'catalog')
@@ -141,7 +141,7 @@ Nitro handlers from constructing a parallel service-operation URL.
 ## Installation
 
 ```bash
-pnpm add @me-tools/odx-nuxt
+pnpm add @odxjs/nuxt
 ```
 
 ## Reactive And Imperative Reads
@@ -618,7 +618,7 @@ optional body, ETag, Location, and SAP message without issuing a follow-up read.
 From the repository root:
 
 ```bash
-pnpm --filter @me-tools/odx-nuxt run verify
+pnpm --filter @odxjs/nuxt run verify
 ```
 
 This runs the Nuxt package generation/module e2e tests, then prepares the
@@ -633,7 +633,7 @@ projection without network access.
 The public Northwind service smoke is intentionally separate from `verify`:
 
 ```bash
-pnpm --filter @me-tools/odx-nuxt run test:live:northwind
+pnpm --filter @odxjs/nuxt run test:live:northwind
 ```
 
 It fetches the V2 and V4 service metadata and performs equivalent bounded,
@@ -658,7 +658,7 @@ so they must be portable filename segments. Relative dot segments (`.` and
 `..`), path separators, control or platform-invalid filename characters,
 trailing dots or spaces, and Windows-reserved device names are rejected.
 
-Registry generation parses each metadata file through `@me-tools/odx-metadata`
+Registry generation parses each metadata file through `@odxjs/metadata`
 and projects entity sets through the core CSDL adapter before invoking the SDK
 generator. Malformed metadata fails preparation with source-aware diagnostics
 instead of producing a silently incomplete registry.

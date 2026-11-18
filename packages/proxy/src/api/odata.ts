@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3'
 import type { Hookable } from 'hookable'
 import type { ODataProxyHooks } from '../types'
-import { flattenOData, mergeHeaders, prepareSapCsrfHeaders } from '@me-tools/odx-core'
+import { flattenOData, mergeHeaders, prepareSapCsrfHeaders } from '@odxjs/core'
 import { createError, defineEventHandler, getHeaders, proxyRequest, readBody, removeResponseHeader, setHeader, setResponseStatus } from 'h3'
 import { ofetch } from 'ofetch'
 import { resolveConnectivityRequest } from '../utils/connectivity-proxy'

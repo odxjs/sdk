@@ -168,14 +168,14 @@ ODX must never depend on Nuxt Fiori.
 
 | Package | Purpose | Publication |
 | --- | --- | --- |
-| @me-tools/odx-metadata | Lossless, UI-neutral OData metadata contract | Public ODX package |
-| @me-tools/fiori-core | Compiler, semantic IR, controllers, planning, diagnostics | Public |
-| @me-tools/fiori-odx | Adapter from semantic intents to ODX contracts | Public |
-| @me-tools/fiori-vue | Vue lifecycle, subscriptions, injection, SSR bindings | Public |
-| @me-tools/fiori-renderer-ui5 | Vue Smart Components using UI5 WC | Public |
-| @me-tools/fiori-renderer-nuxt-ui | Vue Smart Components using Nuxt UI | Public |
-| @me-tools/nuxt-fiori | Nuxt module, compiler, routes, imports, DevTools | Public |
-| @me-tools/fiori-react | Portability adapter after the proof | Public when supported |
+| @odxjs/metadata | Lossless, UI-neutral OData metadata contract | Public ODX package |
+| @odxjs/ui-core | Compiler, semantic IR, controllers, planning, diagnostics | Public |
+| @odxjs/ui-odata | Adapter from semantic intents to ODX contracts | Public |
+| @odxjs/ui-vue | Vue lifecycle, subscriptions, injection, SSR bindings | Public |
+| @odxjs/ui-renderer-ui5 | Vue Smart Components using UI5 WC | Public |
+| @odxjs/ui-renderer-nuxt-ui | Vue Smart Components using Nuxt UI | Public |
+| @odxjs/ui-nuxt | Nuxt module, compiler, routes, imports, DevTools | Public |
+| @odxjs/ui-react | Portability adapter after the proof | Public when supported |
 
 All reusable library packages should be published. Benchmarks, fixtures,
 playgrounds, and examples remain applications or test fixtures rather than

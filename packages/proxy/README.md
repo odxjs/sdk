@@ -1,15 +1,15 @@
-# @me-tools/odx-proxy
+# @odxjs/proxy
 
 Framework-agnostic H3 server handlers for OData request proxying, CSRF token management, and development logging.
 
 ## Installation
 
 ```bash
-pnpm add @me-tools/odx-proxy
+pnpm add @odxjs/proxy
 ```
 
 Explorer schema responses are projected from the loss-aware
-`@me-tools/odx-metadata` CSDL document. Raw XML is parsed once; entity,
+`@odxjs/metadata` CSDL document. Raw XML is parsed once; entity,
 association, navigation, version, and namespace summaries share that parsed
 source instead of maintaining endpoint-specific XML regular expressions.
 Concurrent production refreshes for the same runtime metadata cache share one
@@ -145,7 +145,7 @@ export default defineNuxtConfig({
 
 When enabled, the proxy publishes one privacy-safe summary after each completed
 buffered or streamed request through the `odx:proxy:telemetry` hook. This contract is
-observability-vendor neutral: `@me-tools/odx-proxy` does not depend on evlog,
+observability-vendor neutral: `@odxjs/proxy` does not depend on evlog,
 OpenTelemetry, or a drain provider.
 
 ```ts
@@ -189,14 +189,14 @@ for the evlog fit assessment, security boundaries, and pilot gates.
 From the repository root:
 
 ```bash
-pnpm --filter @me-tools/odx-proxy run verify
+pnpm --filter @odxjs/proxy run verify
 pnpm run bench:proxy
 ```
 
-`pnpm --filter @me-tools/odx-proxy run verify` runs the proxy Vitest suite and
+`pnpm --filter @odxjs/proxy run verify` runs the proxy Vitest suite and
 the same standalone fixture check as `pnpm run example:proxy`. It starts a
 local fixture backend and H3 proxy, then verifies proxied OData reads and
-header forwarding through `@me-tools/odx-proxy`.
+header forwarding through `@odxjs/proxy`.
 
 `pnpm run bench:proxy` runs the proxy performance benchmark. It verifies
 buffer and stream proxy responses match the fixture backend, then reports

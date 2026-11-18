@@ -114,13 +114,13 @@ separate opt-in host concerns.
 
 | Layer | Fit | Decision |
 | --- | --- | --- |
-| `@me-tools/odx-metadata` | Poor | Keep deterministic parsing free of runtime logging. Expose diagnostics as data. |
-| `@me-tools/odx-core` | Poor | Keep transports and `OdxLogStore` framework-neutral. |
-| `@me-tools/odx-proxy` | Good | Produce a sanitized operation summary; do not import evlog. |
-| `@me-tools/odx-nuxt` | Possible later | Keep the adapter host-owned until the lifecycle and bundling constraints are resolved. |
+| `@odxjs/metadata` | Poor | Keep deterministic parsing free of runtime logging. Expose diagnostics as data. |
+| `@odxjs/core` | Poor | Keep transports and `OdxLogStore` framework-neutral. |
+| `@odxjs/proxy` | Good | Produce a sanitized operation summary; do not import evlog. |
+| `@odxjs/nuxt` | Possible later | Keep the adapter host-owned until the lifecycle and bundling constraints are resolved. |
 | ODX Explorer | Complementary | Keep detailed request history and proxy steps; link by correlation ID. |
-| `@me-tools/fiori-core` | Poor | Report lifecycle events through an owned optional port. |
-| `@me-tools/fiori-odx` | Possible later | Propagate operation/request identifiers without depending on evlog. |
+| `@odxjs/ui-core` | Poor | Report lifecycle events through an owned optional port. |
+| `@odxjs/ui-odata` | Possible later | Propagate operation/request identifiers without depending on evlog. |
 | Vue/Nuxt Fiori UI | Limited | Emit semantic lifecycle telemetry, never business values. |
 | Nuxt application host | Very good | Own evlog, drains, sampling, privacy, and deployment configuration. |
 
@@ -230,7 +230,7 @@ a redundant Node-only SAP mock route. A real Worker runtime smoke test remains.
 
 ### Exit criteria
 
-Promote the adapter to `@me-tools/odx-nuxt` only if it remains small and optional. Otherwise publish a separate `@me-tools/odx-observability-evlog` adapter. Abandon it if evlog types enter portable contracts, it duplicates Explorer payload history, or it misses deployment/overhead gates.
+Promote the adapter to `@odxjs/nuxt` only if it remains small and optional. Otherwise publish a separate `@odxjs/observability-evlog` adapter. Abandon it if evlog types enter portable contracts, it duplicates Explorer payload history, or it misses deployment/overhead gates.
 
 ## Future cross-layer telemetry
 
@@ -241,7 +241,7 @@ These events should share the operation ID but remain independent of evlog. Nuxt
 ## Recommended next action
 
 Keep the vendor-neutral ODX summary contract and the successful fixture pilot,
-but do not promote evlog into `@me-tools/odx-nuxt` yet. The official Nitro
+but do not promote evlog into `@odxjs/nuxt` yet. The official Nitro
 module's global `noExternals` mutation and the normal request logger's streamed
 completion timing are too invasive for a default integration.
 

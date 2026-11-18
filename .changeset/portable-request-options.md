@@ -1,6 +1,6 @@
 ---
-'@me-tools/odx-core': minor
-'@me-tools/odx-nuxt': patch
+'@odxjs/core': minor
+'@odxjs/nuxt': patch
 ---
 
 Expose portable request options for imperative OData reads and mutations, and

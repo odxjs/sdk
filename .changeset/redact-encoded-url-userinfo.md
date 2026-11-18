@@ -1,5 +1,5 @@
 ---
-"@me-tools/odx-core": patch
+"@odxjs/core": patch
 ---
 
 Redact query and fragment values that contain fully or partially percent-encoded

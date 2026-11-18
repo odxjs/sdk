@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-nuxt': minor
+'@odxjs/nuxt': minor
 ---
 
 Advertise the response-aware read, mutation, media, relationship, and atomic

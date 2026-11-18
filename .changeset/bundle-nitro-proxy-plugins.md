@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-proxy': patch
+'@odxjs/proxy': patch
 ---
 
 Bundle the proxy's Nitro request plugins with their generated runtime chunks so

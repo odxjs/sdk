@@ -2,7 +2,7 @@ import type { H3Event } from 'h3'
 import type { AddressInfo } from 'node:net'
 import { Buffer } from 'node:buffer'
 import { createServer } from 'node:http'
-import { createODataNavigationRootReference, createODataTypedKey } from '@me-tools/odx-core'
+import { createODataNavigationRootReference, createODataTypedKey } from '@odxjs/core'
 import { expect, it } from 'vitest'
 import { createODataServerMutationService, createODataServerReadService } from '../src/server'
 

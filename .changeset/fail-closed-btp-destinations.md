@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-proxy': patch
+'@odxjs/proxy': patch
 ---
 
 Fail closed when SAP BTP destination resolution cannot establish a valid

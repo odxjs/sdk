@@ -1,4 +1,4 @@
-import type { ODataProxyConfig } from '@me-tools/odx-core'
+import type { ODataProxyConfig } from '@odxjs/core'
 import { createApp, createRouter, defineEventHandler } from 'h3'
 import { createODataHandler } from '../../src'
 

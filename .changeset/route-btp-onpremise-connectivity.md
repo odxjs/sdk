@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-proxy': minor
+'@odxjs/proxy': minor
 ---
 
 Route SAP BTP OnPremise destinations through the authenticated Connectivity

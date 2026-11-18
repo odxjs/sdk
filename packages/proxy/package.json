@@ -1,14 +1,14 @@
 {
-  "name": "@me-tools/odx-proxy",
+  "name": "@odxjs/proxy",
   "type": "module",
   "version": "0.0.1",
   "private": false,
   "description": "H3 and Nitro OData proxy with SAP BTP integration for ODX.",
   "license": "MIT",
-  "homepage": "https://github.com/me-tools/odx#readme",
+  "homepage": "https://github.com/odxjs/sdk#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/me-tools/odx.git",
+    "url": "https://github.com/odxjs/sdk.git",
     "directory": "packages/proxy"
   },
   "exports": {
@@ -47,8 +47,8 @@
     "prepare": "pnpm run build"
   },
   "dependencies": {
-    "@me-tools/odx-core": "workspace:*",
-    "@me-tools/odx-metadata": "workspace:*",
+    "@odxjs/core": "workspace:*",
+    "@odxjs/metadata": "workspace:*",
     "@sap/xsenv": "^6.1.0",
     "@sap/xssec": "^4.13.0",
     "db0": "^0.3.4",

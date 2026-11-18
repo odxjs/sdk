@@ -5,7 +5,7 @@ const siteUrl = process.env.NUXT_PUBLIC_SITE_URL || process.env.NUXT_SITE_URL
 export default defineNuxtConfig({
   extends: ['docus'],
   css: ['~/assets/css/main.css'],
-  modules: ['@me-tools/odx-nuxt', '@nuxtjs/i18n'],
+  modules: ['@odxjs/nuxt', '@nuxtjs/i18n'],
   i18n: {
     defaultLocale: 'en',
     locales: [

@@ -20,7 +20,7 @@ export default defineNitroPlugin((nitro) => {
   }
   catch (e) {
     if (process.env.VCAP_SERVICES) {
-      console.warn('[@me-tools/odx-proxy] Could not initialize XsuaaService:', e)
+      console.warn('[@odxjs/proxy] Could not initialize XsuaaService:', e)
     }
   }
 
@@ -46,7 +46,7 @@ export default defineNitroPlugin((nitro) => {
       event.context.securityContext = securityContext
     }
     catch (err: any) {
-      console.error('[@me-tools/odx-proxy] XSUAA Validation failed:', err.message)
+      console.error('[@odxjs/proxy] XSUAA Validation failed:', err.message)
       throw createError({
         statusCode: err.statusCode || 401,
         statusMessage: 'Unauthorized: Invalid XSUAA token',

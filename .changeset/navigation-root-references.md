@@ -1,6 +1,6 @@
 ---
-'@me-tools/odx-core': patch
-'@me-tools/odx-nuxt': patch
+'@odxjs/core': patch
+'@odxjs/nuxt': patch
 ---
 
 Expose validated `$root` references for exact entity-navigation collection sources.

@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-proxy': patch
+'@odxjs/proxy': patch
 ---
 
 Validate runtime metadata with the shared CSDL parser and the V2/V4 EDMX

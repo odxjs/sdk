@@ -1,5 +1,5 @@
 ---
-"@me-tools/odx-nuxt": minor
+"@odxjs/nuxt": minor
 ---
 
 Add request-scoped unbound OData V4 functions and actions at the service root,

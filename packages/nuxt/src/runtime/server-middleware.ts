@@ -1,4 +1,4 @@
-import type { ODataProxyConfig } from '@me-tools/odx-core'
+import type { ODataProxyConfig } from '@odxjs/core'
 import type { generateODataTypes } from '../generate'
 import { defineEventHandler, getHeader } from 'h3'
 import { useNitroApp, useRuntimeConfig } from 'nitropack/runtime'

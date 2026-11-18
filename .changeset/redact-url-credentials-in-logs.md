@@ -1,5 +1,5 @@
 ---
-"@me-tools/odx-core": patch
+"@odxjs/core": patch
 ---
 
 Redact URL userinfo and known credential query/fragment values in new or updated

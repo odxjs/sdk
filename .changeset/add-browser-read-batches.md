@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-nuxt': minor
+'@odxjs/nuxt': minor
 ---
 
 Expose structured V4 and SAP Gateway V2 read-only batches through the Nuxt

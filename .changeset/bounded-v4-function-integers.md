@@ -1,5 +1,5 @@
 ---
-"@me-tools/odx-core": patch
+"@odxjs/core": patch
 ---
 
 Enforce EDM integer ranges for typed OData V4 function arguments before URL

@@ -6,7 +6,7 @@ const steps = [
     icon: 'i-lucide-package-plus',
     code: `
 \`\`\`bash [terminal]
-pnpm add -D @me-tools/odx-nuxt
+pnpm add -D @odxjs/nuxt
 \`\`\`
 `,
   },
@@ -17,7 +17,7 @@ pnpm add -D @me-tools/odx-nuxt
     code: `
 \`\`\`ts [nuxt.config.ts] {3-11}
 export default defineNuxtConfig({
-  modules: ['@me-tools/odx-nuxt'],
+  modules: ['@odxjs/nuxt'],
   odx: {
     services: {
       sap: {

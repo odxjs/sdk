@@ -1,5 +1,5 @@
 ---
-"@me-tools/odx-metadata": minor
+"@odxjs/metadata": minor
 ---
 
 Expose a vocabulary-neutral runtime guard for the complete versioned CSDL document contract.

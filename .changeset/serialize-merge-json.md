@@ -1,5 +1,5 @@
 ---
-"@me-tools/odx-core": patch
+"@odxjs/core": patch
 ---
 
 Serialize OData MERGE record bodies explicitly as JSON so Fetch-compatible

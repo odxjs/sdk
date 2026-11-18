@@ -5,7 +5,7 @@ guides and generated type reference live in `docs/content`.
 
 ## Metadata Package
 
-`@me-tools/odx-metadata` is the experimental framework-neutral CSDL ingestion
+`@odxjs/metadata` is the experimental framework-neutral CSDL ingestion
 boundary. Its primary functions are:
 
 - `parseCsdl(input, options)` for XML/JSON format detection
@@ -27,7 +27,7 @@ conformance limits and non-goals.
 
 ## Core Package
 
-`@me-tools/odx-core` exposes framework-neutral OData request utilities.
+`@odxjs/core` exposes framework-neutral OData request utilities.
 `createODataClient` retains the typed fetch client's generic parsed and raw
 response methods. HTTP failures reject without automatic console logging;
 explicit host error hooks remain available and own any redaction or reporting.
@@ -109,7 +109,7 @@ correlation. A conforming service should echo the sent IDs as described in
 The contract follows OData 4.01 Part 1, sections 11.7.2 and 11.7.3. It
 contains no Nuxt, Node.js, or transport behavior.
 
-The `@me-tools/odx-core/server` entry accepts loss-aware metadata documents
+The `@odxjs/core/server` entry accepts loss-aware metadata documents
 through `detectODataVersionFromCsdlDocument`,
 `extractEntitiesFromCsdlDocument`, and
 `extractAssociationsFromCsdlDocument`. These functions provide the established
@@ -118,11 +118,11 @@ for compatibility during migration.
 
 ## Nuxt Module
 
-Install and register `@me-tools/odx-nuxt` in `nuxt.config.ts`:
+Install and register `@odxjs/nuxt` in `nuxt.config.ts`:
 
 ```ts
 export default defineNuxtConfig({
-  modules: ['@me-tools/odx-nuxt'],
+  modules: ['@odxjs/nuxt'],
   odata: {
     services: [
       {
@@ -658,7 +658,7 @@ OData V2.
 
 ## Proxy Package
 
-`@me-tools/odx-proxy` exports:
+`@odxjs/proxy` exports:
 
 - `createODataHandler(config)` for standalone H3 usage.
 - `odataGuard(ctx)` and `ODataGuard` rule utilities.
@@ -682,7 +682,7 @@ Ordinary query bytes and the transport input remain unchanged. This is not
 general-purpose secret discovery or retroactive cleanup of existing SQL rows
 and exports; see [Logging and telemetry](./SECURITY.md#logging-and-telemetry).
 
-The Nitro module is available as `@me-tools/odx-proxy/nitro`.
+The Nitro module is available as `@odxjs/proxy/nitro`.
 
 ## Proxy Rules
 

@@ -23,7 +23,7 @@
     "shiki": "^4.0.2"
   },
   "devDependencies": {
-    "@me-tools/odx-nuxt": "workspace:*",
+    "@odxjs/nuxt": "workspace:*",
     "@nuxt/schema": "^4.4.8",
     "@nuxtjs/i18n": "^10.4.0",
     "jiti": "^2.7.0",

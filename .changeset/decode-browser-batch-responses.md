@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-nuxt': patch
+'@odxjs/nuxt': patch
 ---
 
 Decode multipart OData batch responses as text in browser transports so atomic

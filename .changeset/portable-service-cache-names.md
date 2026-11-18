@@ -1,6 +1,6 @@
 ---
-"@me-tools/odx-proxy": patch
-"@me-tools/odx-nuxt": patch
+"@odxjs/proxy": patch
+"@odxjs/nuxt": patch
 ---
 
 Reject service identifiers that cannot safely own generated directories and

@@ -5,14 +5,14 @@ integrations in Nuxt and SAP BTP environments.
 
 The durable architectural rule is separation of concerns:
 
-- `@me-tools/odx-metadata` owns loss-aware, framework-neutral XML and JSON CSDL
+- `@odxjs/metadata` owns loss-aware, framework-neutral XML and JSON CSDL
   ingestion and its versioned document contract.
-- `@me-tools/odx-core` owns framework-agnostic OData types and utilities.
-- `@me-tools/odx-proxy` owns server-side request handling, BTP integration, policy
+- `@odxjs/core` owns framework-agnostic OData types and utilities.
+- `@odxjs/proxy` owns server-side request handling, BTP integration, policy
   enforcement, telemetry, and internal Explorer endpoints.
-- `@me-tools/odx-nuxt` owns Nuxt module registration, runtime config resolution,
+- `@odxjs/nuxt` owns Nuxt module registration, runtime config resolution,
   auto-imported composables, type generation, and DevTools integration.
-- `@me-tools/odx-explorer` owns the browser UI for schema, traffic, entity, and proxy
+- `@odxjs/explorer` owns the browser UI for schema, traffic, entity, and proxy
   inspection.
 - `docs` owns the Docus documentation site and API-reference extraction.
 - `playground` is the local integration surface for development and examples.
@@ -26,17 +26,16 @@ annotation-derived application behavior; ODX owns loss-aware metadata,
 protocol-safe request construction, concrete transports, proxy policy, and
 backend integration.
 
-The first cross-repository contract is now executable rather than aspirational.
-A clean temporary consumer installs packed artifacts from both repositories,
-parses CSDL through `odx-metadata`, builds its Nuxt application, and exercises
-reads, relative navigation, updates, atomic changesets, and canonical draft
-operations through the production ODX proxy. Nuxt Fiori CI repeats that
-consumer against public ODX `main` after its ordinary product verification,
-and ODX CI runs the same consumer against the ODX checkout under test on Node
-24. The consumer contract is implemented once while both change directions are
-protected before merge.
+The cross-repository contract is owned by the UI workspace. A clean temporary
+consumer installs packed artifacts from both repositories, parses CSDL through
+@odxjs/metadata, builds its Nuxt application, and exercises reads, updates,
+relative navigation, atomic changesets, and canonical draft operations through
+the ODX proxy. UI CI uses the public SDK main by default. To verify an SDK
+change before merging it, dispatch UI CI with the SDK branch or commit as
+sdk_ref. Public SDK CI verifies its own packages without requiring access to
+the private UI repository.
 
-Nuxt Fiori still declares `@me-tools/odx-nuxt` as a peer and retains a thin
+Nuxt Fiori still declares `@odxjs/nuxt` as a peer and retains a thin
 structural entity-set port so its framework-neutral packages do not depend on a
 Nuxt transport. ODX now names the portable imperative request-options contract
 and its analytical `$apply` query member. The clean packed consumer proves
@@ -137,7 +136,7 @@ Add low-level OData behavior here when it is useful outside Nuxt or Nitro.
 Proxy is the server boundary between applications and OData backends. It exposes:
 
 - `createODataHandler(config)` for standalone H3 usage.
-- `@me-tools/odx-proxy/nitro` for Nitro module registration.
+- `@odxjs/proxy/nitro` for Nitro module registration.
 - Proxied OData request handling under the configured `basePath`.
 - Internal Explorer APIs under `/__odx__`.
 - BTP destination and XSUAA integration.
@@ -287,7 +286,7 @@ The normal Nuxt runtime path is:
 1. Application code calls `useOData()`.
 2. The composable builds a service/entity URL from public runtime config.
 3. Proxied services call `basePath/service/entitySet`.
-4. Nitro routes the request through `@me-tools/odx-proxy/nitro`.
+4. Nitro routes the request through `@odxjs/proxy/nitro`.
 5. Proxy plugins resolve the target from an absolute URL, SAP BTP destination,
    or local SAP-style mock path.
 6. The proxy prepares headers, applies hooks and declarative rules, then sends

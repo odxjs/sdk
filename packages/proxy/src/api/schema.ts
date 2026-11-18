@@ -1,4 +1,4 @@
-import type { ODataProxyConfig } from '@me-tools/odx-core'
+import type { ODataProxyConfig } from '@odxjs/core'
 import { createError, defineEventHandler, getQuery, setHeader } from 'h3'
 import { enforceExplorerEndpointPolicy, isProductionExplorerRuntime } from '../utils/explorer-policy'
 import { readRuntimeMetadataSnapshot } from '../utils/metadata-refresh'
