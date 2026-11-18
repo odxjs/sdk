@@ -13,6 +13,9 @@ overrides:
   h3@^1: 1.15.11
   vue: 3.5.44
 
+patchedDependencies:
+  docus@5.12.3: e413fe0a0854b6621723ff28a9bf44f4d062f35b60896335dee0f4ce418db920
+
 importers:
 
   .:
@@ -142,7 +145,7 @@ importers:
         version: 0.3.1(@types/markdown-it@14.1.2)(markdown-it@14.1.1)(shiki@4.0.2)
       docus:
         specifier: ^5.12.3
-        version: 5.12.3(69c57255a63a77207ad4fd27105e0944)
+        version: 5.12.3(patch_hash=e413fe0a0854b6621723ff28a9bf44f4d062f35b60896335dee0f4ce418db920)(69c57255a63a77207ad4fd27105e0944)
       embla-carousel:
         specifier: 8.6.0
         version: 8.6.0
@@ -19707,7 +19710,7 @@ snapshots:
 
   diff3@0.0.3: {}
 
-  docus@5.12.3(69c57255a63a77207ad4fd27105e0944):
+  docus@5.12.3(patch_hash=e413fe0a0854b6621723ff28a9bf44f4d062f35b60896335dee0f4ce418db920)(69c57255a63a77207ad4fd27105e0944):
     dependencies:
       '@ai-sdk/gateway': 3.0.145(zod@4.4.3)
       '@ai-sdk/mcp': 1.0.60(zod@4.4.3)

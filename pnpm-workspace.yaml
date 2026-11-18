@@ -19,3 +19,5 @@ overrides:
   '@vue/compiler-sfc': 3.5.44
   h3@^1: 1.15.11
   vue: 3.5.44
+patchedDependencies:
+  docus@5.12.3: patches/docus@5.12.3.patch

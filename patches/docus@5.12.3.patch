@@ -1,0 +1,38 @@
+diff --git a/app/components/docs/DocsAsideRight.vue b/app/components/docs/DocsAsideRight.vue
+index 635a043ce333f8d546ed309c73cd9cfdc3b7c503..0ac0d805d6de2c3820f21f3e26cef7c87f783fad 100644
+--- a/app/components/docs/DocsAsideRight.vue
++++ b/app/components/docs/DocsAsideRight.vue
+@@ -1,9 +1,9 @@
+ <script setup lang="ts">
+ import { useSubNavigation } from '../../composables/useSubNavigation'
+-import type { DocsCollectionItem } from '@nuxt/content'
++import type { PageCollectionItemBase } from '@nuxt/content'
+ 
+ const props = defineProps<{
+-  page?: DocsCollectionItem | null
++  page?: PageCollectionItemBase | null
+ }>()
+ 
+ const links = computed(() => props.page?.body?.toc?.links || [])
+diff --git a/app/composables/useSeo.ts b/app/composables/useSeo.ts
+index c2b099e92f98b80cd16618267ea727390816a765..4c0449887c58d7f20b85438e8efb4cf5b5f94d40 100644
+--- a/app/composables/useSeo.ts
++++ b/app/composables/useSeo.ts
+@@ -76,7 +76,7 @@ export function useSeo(options: UseSeoOptions) {
+   // Set canonical link
+   useHead({
+     link: computed(() => {
+-      const links: Array<{ rel: string, href?: string, hreflang?: string }> = []
++      const links: Array<{ rel: 'canonical', href: string } | { rel: 'alternate', href: string, hreflang: string }> = []
+ 
+       // Canonical URL
+       if (canonicalUrl.value) {
+@@ -125,7 +125,7 @@ export function useSeo(options: UseSeoOptions) {
+   // JSON-LD structured data
+   useHead({
+     script: computed(() => {
+-      const scripts: Array<{ type: string, innerHTML: string }> = []
++      const scripts: Array<{ type: 'application/ld+json', innerHTML: string }> = []
+ 
+       if (!baseUrl.value || !title.value) return scripts
+ 
