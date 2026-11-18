@@ -1,4 +1,4 @@
-import type { ODataProxyConfig } from '@me-tools/odx-core'
+import type { ODataProxyConfig } from '@odxjs/core'
 import type { Server } from 'node:http'
 import { createServer, request } from 'node:http'
 import { toNodeListener } from 'h3'

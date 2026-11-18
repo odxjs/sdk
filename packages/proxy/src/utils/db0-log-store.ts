@@ -6,9 +6,9 @@ import type {
   OdxLogQueryOptions,
   OdxLogStore,
   OdxLogUpdateOptions,
-} from '@me-tools/odx-core'
+} from '@odxjs/core'
 import type { Database } from 'db0'
-import { sanitizeODataLog } from '@me-tools/odx-core'
+import { sanitizeODataLog } from '@odxjs/core'
 
 interface StoredLogRow {
   id: string

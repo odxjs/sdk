@@ -1,5 +1,5 @@
 ---
-"@me-tools/odx-proxy": patch
+"@odxjs/proxy": patch
 ---
 
 Apply configured global auth and header defaults to normal proxied data requests

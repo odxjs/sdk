@@ -1,4 +1,4 @@
-import type { ModuleOptions, ODataProxyConfig, ODataPublicConfig } from '@me-tools/odx-core'
+import type { ModuleOptions, ODataProxyConfig, ODataPublicConfig } from '@odxjs/core'
 import type { NitroConfig } from 'nitropack'
 import {
   addImportsDir,
@@ -12,7 +12,7 @@ import { setupTypeGeneration } from './generate'
 
 export default defineNuxtModule<ModuleOptions>({
   meta: {
-    name: '@me-tools/odx-nuxt',
+    name: '@odxjs/nuxt',
     configKey: 'odata',
   },
   defaults: {
@@ -50,8 +50,8 @@ export default defineNuxtModule<ModuleOptions>({
     // 4. Integrate with Nitro
     nuxt.options.nitro.odata = odataConfig
     nuxt.options.nitro.modules = nuxt.options.nitro.modules || []
-    if (!nuxt.options.nitro.modules.includes('@me-tools/odx-proxy/nitro')) {
-      nuxt.options.nitro.modules.push('@me-tools/odx-proxy/nitro')
+    if (!nuxt.options.nitro.modules.includes('@odxjs/proxy/nitro')) {
+      nuxt.options.nitro.modules.push('@odxjs/proxy/nitro')
     }
 
     // 5. Setup Type Generation

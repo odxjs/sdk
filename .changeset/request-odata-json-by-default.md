@@ -1,6 +1,6 @@
 ---
-'@me-tools/odx-core': patch
-'@me-tools/odx-nuxt': patch
+'@odxjs/core': patch
+'@odxjs/nuxt': patch
 ---
 
 Request JSON responses by default for OData reads while preserving explicit

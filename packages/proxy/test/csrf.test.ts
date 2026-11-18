@@ -1,4 +1,4 @@
-import { fetchWithCsrf, prepareSapCsrfHeaders, SapCsrfTokenError } from '@me-tools/odx-core'
+import { fetchWithCsrf, prepareSapCsrfHeaders, SapCsrfTokenError } from '@odxjs/core'
 import { ofetch } from 'ofetch'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 

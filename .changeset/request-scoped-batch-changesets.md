@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-nuxt': minor
+'@odxjs/nuxt': minor
 ---
 
 Add request-scoped independent V4 changeset batches with explicit capability

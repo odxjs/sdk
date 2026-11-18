@@ -1,6 +1,6 @@
 ---
-'@me-tools/odx-core': patch
-'@me-tools/odx-nuxt': patch
+'@odxjs/core': patch
+'@odxjs/nuxt': patch
 ---
 
 Document and verify that structured OData action parameters remain exact nested

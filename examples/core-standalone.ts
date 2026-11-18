@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { $odata, flattenOData, stringifyQuery } from '@me-tools/odx-core'
-import { detectODataVersionFromCsdlDocument, extractEntitiesFromCsdlDocument } from '@me-tools/odx-core/server'
-import { parseCsdl } from '@me-tools/odx-metadata'
+import { $odata, flattenOData, stringifyQuery } from '@odxjs/core'
+import { detectODataVersionFromCsdlDocument, extractEntitiesFromCsdlDocument } from '@odxjs/core/server'
+import { parseCsdl } from '@odxjs/metadata'
 
 interface TestItem {
   ID: string
@@ -121,7 +121,7 @@ async function main(): Promise<void> {
   assertStandaloneCoreBehavior(lowLevelResponse)
 
   console.warn(JSON.stringify({
-    package: '@me-tools/odx-core',
+    package: '@odxjs/core',
     version,
     entitySets: entities.map(entity => ({
       name: entity.name,

@@ -26,11 +26,11 @@ async function main() {
   assertReleaseTagAllowed(tag, process.env.ALLOW_LATEST)
 
   const publishOrder = [
-    '@me-tools/odx-metadata',
-    '@me-tools/odx-core',
-    '@me-tools/odx-proxy',
-    '@me-tools/odx-explorer',
-    '@me-tools/odx-nuxt',
+    '@odxjs/metadata',
+    '@odxjs/core',
+    '@odxjs/proxy',
+    '@odxjs/explorer',
+    '@odxjs/nuxt',
   ]
   const releasePackages = publishOrder.map((packageName) => {
     const pkg = workspace.packages.find(candidate => candidate.data.name === packageName)

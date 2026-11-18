@@ -1,5 +1,5 @@
 ---
-"@me-tools/odx-core": patch
+"@odxjs/core": patch
 ---
 
 Keep encoded URL-userinfo redaction fail-closed when an otherwise recognizable

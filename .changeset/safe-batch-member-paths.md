@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-core': patch
+'@odxjs/core': patch
 ---
 
 Reject traversing, backslash, fragmented, and malformed service-relative paths

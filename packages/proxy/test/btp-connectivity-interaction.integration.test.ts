@@ -1,4 +1,4 @@
-import type { ODataProxyConfig } from '@me-tools/odx-core'
+import type { ODataProxyConfig } from '@odxjs/core'
 import { createServer } from 'node:http'
 import { connect } from 'node:net'
 import process from 'node:process'

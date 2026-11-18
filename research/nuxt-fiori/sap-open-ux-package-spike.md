@@ -18,7 +18,7 @@ and vocabulary-breadth references.
 
 ODX remains the only metadata parser and loss-aware metadata owner. Nuxt Fiori
 owns its semantic bundle, diagnostics, compiler policy, and runtime controllers.
-SAP package types do not leak into public `@me-tools` contracts.
+SAP package types do not leak into public `@odxjs` contracts.
 
 The 2026-07-14 evidence below is retained because it defines when bounded reuse
 may become worthwhile for wider vocabulary coverage.

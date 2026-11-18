@@ -1,5 +1,5 @@
-import type { OdxLogClearOptions, OdxLogQueryOptions } from '@me-tools/odx-core'
-import { clearODataLogs, getODataLogs } from '@me-tools/odx-core'
+import type { OdxLogClearOptions, OdxLogQueryOptions } from '@odxjs/core'
+import { clearODataLogs, getODataLogs } from '@odxjs/core'
 import { createError, defineEventHandler, getQuery } from 'h3'
 import { enforceExplorerEndpointPolicy, isProductionExplorerRuntime } from '../utils/explorer-policy'
 import { configureOdxLogStore, isPersistentOdxLogStoreConfigured } from '../utils/log-store'

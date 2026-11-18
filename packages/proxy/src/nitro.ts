@@ -1,4 +1,4 @@
-import type { ODataProxyConfig } from '@me-tools/odx-core'
+import type { ODataProxyConfig } from '@odxjs/core'
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { defineNitroModule } from 'nitropack/kit'

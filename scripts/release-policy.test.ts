@@ -32,19 +32,19 @@ describe('odx release policy', () => {
 
   it('derives the release identity from one coordinated public package version', () => {
     expect(coordinatedReleaseVersion([
-      { name: '@me-tools/odx-core', version: '0.0.1-next.0' },
-      { name: '@me-tools/odx-nuxt', version: '0.0.1-next.0' },
+      { name: '@odxjs/core', version: '0.0.1-next.0' },
+      { name: '@odxjs/nuxt', version: '0.0.1-next.0' },
     ])).toBe('0.0.1-next.0')
   })
 
   it('rejects missing, invalid, or divergent public package versions', () => {
     expect(() => coordinatedReleaseVersion([])).toThrow('at least one public package')
     expect(() => coordinatedReleaseVersion([
-      { name: '@me-tools/odx-core', version: 'next' },
+      { name: '@odxjs/core', version: 'next' },
     ])).toThrow('invalid version')
     expect(() => coordinatedReleaseVersion([
-      { name: '@me-tools/odx-core', version: '0.0.1-next.0' },
-      { name: '@me-tools/odx-nuxt', version: '0.0.2-next.0' },
+      { name: '@odxjs/core', version: '0.0.1-next.0' },
+      { name: '@odxjs/nuxt', version: '0.0.2-next.0' },
     ])).toThrow('must share one coordinated release version')
   })
 

@@ -1,4 +1,4 @@
-import { mergeHeaders } from '@me-tools/odx-core'
+import { mergeHeaders } from '@odxjs/core'
 
 /**
  * Restricted headers that should not be forwarded to the target OData service.

@@ -1,10 +1,10 @@
-import type { ModuleOptions, ODataProxyConfig, ODataPublicConfig, ODataServiceConfig } from '@me-tools/odx-core'
+import type { ModuleOptions, ODataProxyConfig, ODataPublicConfig, ODataServiceConfig } from '@odxjs/core'
 import process from 'node:process'
+import { useLogger } from '@nuxt/kit'
 import {
   normalizeODataProxyBasePath,
   normalizeODataServiceRoutes,
-} from '@me-tools/odx-proxy'
-import { useLogger } from '@nuxt/kit'
+} from '@odxjs/proxy'
 import { parseSafeHttpServiceUrl } from './service-url'
 
 const RE_UNDERSCORE = /_/g
@@ -32,7 +32,7 @@ function getBtpServiceConfig(serviceName?: string): Record<string, any> {
  * Resolves and merges module options with environment variables.
  */
 export function resolveModuleConfig(options: ModuleOptions, nuxtOptions: any): ODataProxyConfig {
-  const logger = useLogger('@me-tools/odx-nuxt')
+  const logger = useLogger('@odxjs/nuxt')
 
   const btpOverrides = getBtpServiceConfig(options.btpConfigService)
 
@@ -43,7 +43,7 @@ export function resolveModuleConfig(options: ModuleOptions, nuxtOptions: any): O
       return JSON.parse(envValue)
     }
     catch {
-      logger.warn('[@me-tools/odx-nuxt] Ignoring malformed JSON from an OData environment override')
+      logger.warn('[@odxjs/nuxt] Ignoring malformed JSON from an OData environment override')
       return {}
     }
   }
@@ -63,7 +63,7 @@ export function resolveModuleConfig(options: ModuleOptions, nuxtOptions: any): O
       return undefined
     if (value === 'sap' || value === 'none')
       return value
-    throw new Error('[@me-tools/odx-nuxt] Invalid OData CSRF mode; expected "sap" or "none"')
+    throw new Error('[@odxjs/nuxt] Invalid OData CSRF mode; expected "sap" or "none"')
   }
 
   const parseCsrfFetchMethod = (value: unknown): 'HEAD' | 'GET' | undefined => {
@@ -71,7 +71,7 @@ export function resolveModuleConfig(options: ModuleOptions, nuxtOptions: any): O
       return undefined
     if (value === 'HEAD' || value === 'GET')
       return value
-    throw new Error('[@me-tools/odx-nuxt] Invalid OData CSRF fetch method; expected "HEAD" or "GET"')
+    throw new Error('[@odxjs/nuxt] Invalid OData CSRF fetch method; expected "HEAD" or "GET"')
   }
 
   const resolveCsrfConfig = (

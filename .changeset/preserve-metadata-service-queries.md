@@ -1,6 +1,6 @@
 ---
-'@me-tools/odx-nuxt': patch
-'@me-tools/odx-proxy': patch
+'@odxjs/nuxt': patch
+'@odxjs/proxy': patch
 ---
 
 Build metadata request paths structurally so service query parameters such as

@@ -1,6 +1,6 @@
 ---
-"@me-tools/odx-core": minor
-"@me-tools/odx-nuxt": minor
+"@odxjs/core": minor
+"@odxjs/nuxt": minor
 ---
 
 Preserve optional bodies, ETags, Locations, and SAP messages from direct OData

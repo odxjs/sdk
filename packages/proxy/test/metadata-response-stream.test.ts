@@ -1,4 +1,4 @@
-import type { ODataProxyConfig, ODataServiceConfig } from '@me-tools/odx-core'
+import type { ODataProxyConfig, ODataServiceConfig } from '@odxjs/core'
 import type { H3Event } from 'h3'
 import type { ClientRequest, IncomingMessage } from 'node:http'
 import { Buffer } from 'node:buffer'

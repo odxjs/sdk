@@ -141,7 +141,7 @@ importers:
         specifier: ^4.0.2
         version: 4.0.2
     devDependencies:
-      '@me-tools/odx-nuxt':
+      '@odxjs/nuxt':
         specifier: workspace:*
         version: link:../packages/nuxt
       '@nuxt/schema':
@@ -168,7 +168,7 @@ importers:
 
   packages/core:
     dependencies:
-      '@me-tools/odx-metadata':
+      '@odxjs/metadata':
         specifier: workspace:*
         version: link:../metadata
       ofetch:
@@ -193,7 +193,7 @@ importers:
 
   packages/explorer:
     dependencies:
-      '@me-tools/odx-core':
+      '@odxjs/core':
         specifier: workspace:*
         version: link:../core
       '@nuxt/ui':
@@ -254,16 +254,16 @@ importers:
 
   packages/nuxt:
     dependencies:
-      '@me-tools/odx-core':
+      '@odxjs/core':
         specifier: workspace:*
         version: link:../core
-      '@me-tools/odx-explorer':
+      '@odxjs/explorer':
         specifier: workspace:*
         version: link:../explorer
-      '@me-tools/odx-metadata':
+      '@odxjs/metadata':
         specifier: workspace:*
         version: link:../metadata
-      '@me-tools/odx-proxy':
+      '@odxjs/proxy':
         specifier: workspace:*
         version: link:../proxy
       '@nuxt/devtools-kit':
@@ -327,10 +327,10 @@ importers:
 
   packages/proxy:
     dependencies:
-      '@me-tools/odx-core':
+      '@odxjs/core':
         specifier: workspace:*
         version: link:../core
-      '@me-tools/odx-metadata':
+      '@odxjs/metadata':
         specifier: workspace:*
         version: link:../metadata
       '@sap/xsenv':
@@ -388,7 +388,7 @@ importers:
 
   playground:
     devDependencies:
-      '@me-tools/odx-nuxt':
+      '@odxjs/nuxt':
         specifier: workspace:*
         version: link:../packages/nuxt
       '@nuxt/ui':

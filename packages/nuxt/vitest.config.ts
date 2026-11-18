@@ -9,7 +9,7 @@ export default defineConfig({
         replacement: fileURLToPath(new URL('./test/imports.mock.ts', import.meta.url)),
       },
       {
-        find: /^@me-tools\/odx-proxy$/u,
+        find: /^@odxjs\/proxy$/u,
         replacement: fileURLToPath(new URL('../proxy/src/index.ts', import.meta.url)),
       },
     ],

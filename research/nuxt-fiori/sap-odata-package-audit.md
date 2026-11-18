@@ -21,7 +21,7 @@ packages, but none matches the required boundary:
   project assumptions.
 
 The first slice is therefore implemented with dependency-free
-`@me-tools/fiori-core` and a portable `@me-tools/fiori-odx` adapter. SAP
+`@odxjs/ui-core` and a portable `@odxjs/ui-odata` adapter. SAP
 packages remain compatibility and vocabulary oracles. They can be reconsidered
 for offline corpus generation if maintaining the full vocabulary catalog becomes
 more expensive than isolating their Node-only tooling.
@@ -35,7 +35,7 @@ more expensive than isolating their Node-only tooling.
 | Plain artifacts | Production clients should consume a semantic bundle, not raw CSDL or a vocabulary compiler. |
 | Deterministic diagnostics | Unsupported or ambiguous semantics must be explainable and source-linked. |
 | Small dependency graph | The first slice should not acquire server connectivity, code generation, UI5 project, or mock-server dependencies. |
-| Owned public contract | SAP-specific types must not leak into `@me-tools` APIs. |
+| Owned public contract | SAP-specific types must not leak into `@odxjs` APIs. |
 
 ## Candidate findings
 
@@ -100,8 +100,8 @@ same date:
 
 ```text
 ODX CsdlDocument
-  -> @me-tools/fiori-odx portable projection
-  -> @me-tools/fiori-core semantic compiler
+  -> @odxjs/ui-odata portable projection
+  -> @odxjs/ui-core semantic compiler
   -> JSON semantic bundle
 ```
 
@@ -124,7 +124,7 @@ Verification results:
 - the real XML fixture compiled to one entity, one collection, two line items,
   and zero diagnostics;
 - a second isolated runtime consumer installed only
-  `@me-tools/fiori-core`;
+  `@odxjs/ui-core`;
 - packed `fiori-core` was 12,768 bytes and packed `fiori-odx` was 11,810
   bytes at version `0.0.0`;
 - shipped JavaScript/declarations contained no SAP or `node:` imports.

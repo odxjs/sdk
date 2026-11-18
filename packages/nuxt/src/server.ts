@@ -34,7 +34,7 @@ import type {
   ODataV2AtomicMutation,
   ODataV2FunctionImportInvocation,
   ODataV2FunctionImportResponseCapability,
-} from '@me-tools/odx-core'
+} from '@odxjs/core'
 import type { H3Event } from 'h3'
 import {
   $odata,
@@ -72,7 +72,7 @@ import {
   stringifyQuery,
   validateODataIdentifier,
   validateODataQualifiedName,
-} from '@me-tools/odx-core'
+} from '@odxjs/core'
 import { createFetch } from 'ofetch'
 
 interface ODataFetchClient {

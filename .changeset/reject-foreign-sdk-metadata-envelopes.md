@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-nuxt': patch
+'@odxjs/nuxt': patch
 ---
 
 Require a parsed OData V2/V4 EDMX envelope before SDK metadata is accepted.

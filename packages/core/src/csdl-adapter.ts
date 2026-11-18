@@ -1,4 +1,4 @@
-import type { CsdlDocument, CsdlXmlElement } from '@me-tools/odx-metadata'
+import type { CsdlDocument, CsdlXmlElement } from '@odxjs/metadata'
 import type {
   Association,
   AssociationEnd,
@@ -10,7 +10,7 @@ import {
   getXmlAttribute,
   getXmlChildren,
   walkCsdlNodes,
-} from '@me-tools/odx-metadata'
+} from '@odxjs/metadata'
 
 interface EntityTypeProjection {
   properties: EntityProperty[]

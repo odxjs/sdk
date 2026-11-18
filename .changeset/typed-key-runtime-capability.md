@@ -1,6 +1,6 @@
 ---
-"@me-tools/odx-core": minor
-"@me-tools/odx-nuxt": patch
+"@odxjs/core": minor
+"@odxjs/nuxt": patch
 ---
 
 Advertise `supportsTypedEntityKeys` on the complete Nuxt runtime and server
