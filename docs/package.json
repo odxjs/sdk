@@ -23,9 +23,9 @@
     "shiki": "^4.0.2"
   },
   "devDependencies": {
-    "@odxjs/nuxt": "workspace:*",
     "@nuxt/schema": "^4.6.3",
     "@nuxtjs/i18n": "^10.4.0",
+    "@odxjs/nuxt": "workspace:*",
     "jiti": "^2.7.0",
     "nuxt": "^4.6.3",
     "oxc-parser": "0.140.0",

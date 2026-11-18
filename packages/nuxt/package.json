@@ -73,13 +73,13 @@
     "vue": "^3.5.39"
   },
   "dependencies": {
-    "@odxjs/core": "workspace:*",
-    "@odxjs/metadata": "workspace:*",
-    "@odxjs/proxy": "workspace:*",
     "@nuxt/devtools-kit": "4.0.0",
     "@nuxt/kit": "4.6.3",
     "@nuxt/schema": "4.6.3",
     "@odata2ts/odata2ts": "^0.40.1",
+    "@odxjs/core": "workspace:*",
+    "@odxjs/metadata": "workspace:*",
+    "@odxjs/proxy": "workspace:*",
     "consola": "3.4.2",
     "h3": "1.15.11",
     "nitropack": "2.13.4",
@@ -88,9 +88,9 @@
     "sirv": "3.0.2"
   },
   "devDependencies": {
-    "@odxjs/explorer": "workspace:*",
     "@nuxt/module-builder": "1.0.3",
     "@nuxt/test-utils": "^4.3.4",
+    "@odxjs/explorer": "workspace:*",
     "@types/node": "^26.1.1",
     "@vitejs/devtools-kit": "0.8.0",
     "nuxt": "^4.6.3",

@@ -2,7 +2,7 @@
   "name": "nuxt-sap-odata-playground",
   "private": true,
   "devDependencies": {
-    "@odxjs/nuxt": "workspace:*",
-    "@nuxt/ui": "^4.12.0"
+    "@nuxt/ui": "^4.12.0",
+    "@odxjs/nuxt": "workspace:*"
   }
 }

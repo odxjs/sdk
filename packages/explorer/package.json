@@ -52,8 +52,8 @@
     "vue": "^3.5.44"
   },
   "dependencies": {
-    "@odxjs/core": "workspace:*",
     "@nuxt/ui": "4.12.0",
+    "@odxjs/core": "workspace:*",
     "@vue-flow/background": "^1.3.2",
     "@vue-flow/core": "^1.48.2",
     "@vueuse/core": "14.2.1",
