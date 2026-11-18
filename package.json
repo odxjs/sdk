@@ -38,7 +38,7 @@
     "build:packages": "pnpm --filter @odxjs/metadata build && pnpm --filter @odxjs/core build && pnpm --filter @odxjs/proxy build && pnpm --filter @odxjs/explorer build && pnpm --filter @odxjs/nuxt build",
     "verify": "pnpm run lint && pnpm run typecheck && pnpm run verify:packages && pnpm run verify:publishing",
     "verify:publishing": "pnpm run build:packages && tsx scripts/verify-package-exports.ts",
-    "build:deployment": "pnpm --filter @odxjs/explorer build && pnpm --filter @odxjs/proxy build:runtime && shx cp -f packages/explorer/.output/server/package.json packages/explorer/.output/package.json && shx cp -f packages/proxy/.output/server/package.json packages/proxy/.output/package.json && mbt build -t mta_archives --mtar odx-fullstack.mtar"
+    "build:deployment": "pnpm --filter @odxjs/explorer exec nuxi build && pnpm --filter @odxjs/proxy build:runtime && shx cp -f packages/explorer/.output/server/package.json packages/explorer/.output/package.json && shx cp -f packages/proxy/.output/server/package.json packages/proxy/.output/package.json && mbt build -t mta_archives --mtar odx-fullstack.mtar"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^7.7.3",
