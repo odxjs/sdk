@@ -40,7 +40,8 @@ export default defineAppConfig({
   header: {
     title: 'ODX.js SDK',
   },
-  socials: {
-    github: 'odxjs/sdk',
+  github: {
+    url: 'https://github.com/odxjs/sdk',
+    rootDir: 'docs',
   },
 })

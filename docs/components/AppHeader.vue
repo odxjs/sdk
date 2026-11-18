@@ -1,7 +1,6 @@
 <script setup lang="ts">
-const { socials } = useAppConfig() as {
-  socials: Record<string, string>
-}
+const appConfig = useAppConfig()
+const githubUrl = computed(() => appConfig.github ? appConfig.github.url : undefined)
 </script>
 
 <template>
@@ -30,8 +29,9 @@ const { socials } = useAppConfig() as {
           </ClientOnly>
 
           <UButton
-            v-if="socials.github"
-            :to="`https://github.com/${socials.github}`"
+            v-if="githubUrl"
+            :to="githubUrl"
+            aria-label="GitHub repository"
             target="_blank"
             color="neutral"
             variant="ghost"
