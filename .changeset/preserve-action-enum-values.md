@@ -1,6 +1,6 @@
 ---
-'@me-tools/odx-core': patch
-'@me-tools/odx-nuxt': patch
+'@odxjs/core': patch
+'@odxjs/nuxt': patch
 ---
 
 Document and verify that OData action enumeration parameters remain exact

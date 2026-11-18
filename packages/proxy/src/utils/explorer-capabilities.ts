@@ -1,4 +1,4 @@
-import type { ODataExplorerHostCapabilities, ODataServiceConfig } from '@me-tools/odx-core'
+import type { ODataExplorerHostCapabilities, ODataServiceConfig } from '@odxjs/core'
 import type { H3Event } from 'h3'
 import { isProductionExplorerRuntime } from './explorer-policy'
 

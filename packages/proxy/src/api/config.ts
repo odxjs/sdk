@@ -1,4 +1,4 @@
-import type { EntityMapping, ODataExplorerConfigResponse, ODataExplorerServiceInfo, ODataProxyConfig } from '@me-tools/odx-core'
+import type { EntityMapping, ODataExplorerConfigResponse, ODataExplorerServiceInfo, ODataProxyConfig } from '@odxjs/core'
 import process from 'node:process'
 import { defineEventHandler } from 'h3'
 import { projectExplorerDataMethods, resolveExplorerHostCapabilities } from '../utils/explorer-capabilities'

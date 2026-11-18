@@ -8,7 +8,7 @@ import {
   redactSensitiveHeaders,
   sanitizeODataLog,
   updateODataLog,
-} from '@me-tools/odx-core'
+} from '@odxjs/core'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 describe('proxy Dev Logs', () => {

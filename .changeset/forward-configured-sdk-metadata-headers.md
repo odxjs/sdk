@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-nuxt': patch
+'@odxjs/nuxt': patch
 ---
 
 Apply configured global and service headers to SDK metadata downloads using

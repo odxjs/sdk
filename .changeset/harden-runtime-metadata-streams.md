@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-proxy': patch
+'@odxjs/proxy': patch
 ---
 
 Preserve multibyte UTF-8 text across runtime metadata response chunks and reject

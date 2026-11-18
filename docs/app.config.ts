@@ -41,6 +41,6 @@ export default defineAppConfig({
     title: 'ODX',
   },
   socials: {
-    github: 'me-tools/odx',
+    github: 'odxjs/sdk',
   },
 })

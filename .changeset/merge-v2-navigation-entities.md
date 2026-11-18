@@ -1,6 +1,6 @@
 ---
-'@me-tools/odx-core': minor
-'@me-tools/odx-nuxt': minor
+'@odxjs/core': minor
+'@odxjs/nuxt': minor
 ---
 
 Add capability-negotiated SAP Gateway OData V2 MERGE updates for to-one and

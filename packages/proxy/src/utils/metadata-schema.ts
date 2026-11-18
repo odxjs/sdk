@@ -1,11 +1,11 @@
-import type { Association, EntityMapping } from '@me-tools/odx-core'
-import type { CsdlDocument, CsdlXmlElement } from '@me-tools/odx-metadata'
+import type { Association, EntityMapping } from '@odxjs/core'
+import type { CsdlDocument, CsdlXmlElement } from '@odxjs/metadata'
 import {
   detectODataVersionFromCsdlDocument,
   extractAssociationsFromCsdlDocument,
   extractEntitiesFromCsdlDocument,
-} from '@me-tools/odx-core/server'
-import { getXmlAttribute, parseCsdl, walkCsdlNodes } from '@me-tools/odx-metadata'
+} from '@odxjs/core/server'
+import { getXmlAttribute, parseCsdl, walkCsdlNodes } from '@odxjs/metadata'
 
 export interface MetadataSchemaProjection {
   version: 'v2' | 'v4' | null

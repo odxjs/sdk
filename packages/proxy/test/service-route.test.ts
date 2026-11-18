@@ -1,4 +1,4 @@
-import type { ODataServiceConfig } from '@me-tools/odx-core'
+import type { ODataServiceConfig } from '@odxjs/core'
 import { describe, expect, it } from 'vitest'
 import {
   assertSafeODataServiceName,

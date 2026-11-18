@@ -1,6 +1,6 @@
 ---
-'@me-tools/odx-core': minor
-'@me-tools/odx-nuxt': minor
+'@odxjs/core': minor
+'@odxjs/nuxt': minor
 ---
 
 Add typed `listNavigation` reads for related collections that integrate with

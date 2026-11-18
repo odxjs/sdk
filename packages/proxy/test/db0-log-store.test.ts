@@ -1,6 +1,6 @@
-import type { ODataProxyConfig } from '@me-tools/odx-core'
+import type { ODataProxyConfig } from '@odxjs/core'
 import type { ResolvedOdxLogStoreConfig } from '../src/utils/log-store'
-import { addODataLog, clearODataLogs, getODataLog, getODataLogs, updateODataLog } from '@me-tools/odx-core'
+import { addODataLog, clearODataLogs, getODataLog, getODataLogs, updateODataLog } from '@odxjs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import logsHandler from '../src/api/logs'
 import { OdxDb0LogStore } from '../src/utils/db0-log-store'

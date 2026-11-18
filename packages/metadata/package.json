@@ -1,14 +1,14 @@
 {
-  "name": "@me-tools/odx-metadata",
+  "name": "@odxjs/metadata",
   "type": "module",
   "version": "0.0.1",
   "private": false,
   "description": "Framework-neutral OData CSDL metadata ingestion for ODX.",
   "license": "MIT",
-  "homepage": "https://github.com/me-tools/odx#readme",
+  "homepage": "https://github.com/odxjs/sdk#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/me-tools/odx.git",
+    "url": "https://github.com/odxjs/sdk.git",
     "directory": "packages/metadata"
   },
   "exports": {

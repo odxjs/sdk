@@ -1,6 +1,6 @@
 ---
-'@me-tools/odx-core': minor
-'@me-tools/odx-nuxt': minor
+'@odxjs/core': minor
+'@odxjs/nuxt': minor
 ---
 
 Support service-, collection-, and entity-bound OData actions as typed members

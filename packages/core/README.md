@@ -1,4 +1,4 @@
-# @me-tools/odx-core
+# @odxjs/core
 
 Framework-agnostic OData types and low-level utilities for handling results,
 metadata, query stringification, and safe resource-path construction.
@@ -12,7 +12,7 @@ telemetry; do not log the complete error or response in production.
 The package also exports `prepareSapCsrfHeaders` and `fetchWithCsrf` for
 server/edge transports. These helpers are not browser transports: browsers
 cannot read SAP `Set-Cookie` responses or emit the matching `Cookie` header.
-Browser applications should send mutations through `@me-tools/odx-proxy`.
+Browser applications should send mutations through `@odxjs/proxy`.
 
 Portable path helpers include `formatODataKey`, `createODataEntityPath`,
 `createODataEntityReference`, `createODataMediaPath`,
@@ -37,7 +37,7 @@ or Int64 identity to a JavaScript number, or pass an unquoted path fragment.
 Use `createODataTypedKey` with the metadata-owned EDM type and explicit protocol:
 
 ```ts
-import { createODataEntityPath, createODataTypedKey } from '@me-tools/odx-core'
+import { createODataEntityPath, createODataTypedKey } from '@odxjs/core'
 
 const key = createODataTypedKey([
   { field: 'ID', type: 'Edm.Decimal', value: '9007199254740993.1234567890' },
@@ -155,8 +155,8 @@ the explicit `null` used by OData 4.01 to advertise non-availability. ODX does
 not execute an advertised `target`; higher layers retain ownership of validated
 operation identity and binding paths.
 
-The `@me-tools/odx-core/server` entry also projects parsed
-`@me-tools/odx-metadata` documents into the established entity, navigation,
+The `@odxjs/core/server` entry also projects parsed
+`@odxjs/metadata` documents into the established entity, navigation,
 association, and version contracts. Callers parse XML or JSON CSDL through
 `parseCsdl` first; core no longer exposes a second regex- or file-based EDMX
 parser.
@@ -183,7 +183,7 @@ existing SQL rows and exported logs are not automatically cleaned. Custom
 ## Installation
 
 ```bash
-pnpm add @me-tools/odx-core
+pnpm add @odxjs/core
 ```
 
 ## Verification
@@ -191,7 +191,7 @@ pnpm add @me-tools/odx-core
 From the repository root:
 
 ```bash
-pnpm --filter @me-tools/odx-core run verify
+pnpm --filter @odxjs/core run verify
 ```
 
 This runs the focused core Vitest tests and then the same standalone core

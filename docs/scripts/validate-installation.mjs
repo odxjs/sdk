@@ -3,7 +3,7 @@ import { join, relative } from 'node:path'
 import process from 'node:process'
 
 const contentRoot = join(process.cwd(), 'content')
-const installCommand = /(?:pnpm add|npm install|yarn add) @me-tools\/odx-/u
+const installCommand = /(?:pnpm add|npm install|yarn add) @odxjs\//u
 
 async function markdownFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true })

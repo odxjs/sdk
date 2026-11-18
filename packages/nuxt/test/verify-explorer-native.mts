@@ -367,7 +367,7 @@ async function main(): Promise<void> {
       startedAt,
       finishedAt: new Date().toISOString(),
       elapsedMs: Math.round(performance.now() - start),
-      command: 'pnpm --filter @me-tools/odx-nuxt test:explorer-native',
+      command: 'pnpm --filter @odxjs/nuxt test:explorer-native',
       revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim(),
       dirty: Boolean(execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim()),
       sourceHash: source.digest('hex'),

@@ -24,11 +24,11 @@ export default defineBuildConfig({
       const require = createRequire(import.meta.url)
       let manifestPath: string
       try {
-        manifestPath = require.resolve('@me-tools/odx-explorer/client-manifest')
+        manifestPath = require.resolve('@odxjs/explorer/client-manifest')
         const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-        const explorerRoot = dirname(require.resolve('@me-tools/odx-explorer/package.json'))
+        const explorerRoot = dirname(require.resolve('@odxjs/explorer/package.json'))
         const { getExplorerSourceHash, getWorkspaceLockHash, listClientFiles } = await import(pathToFileURL(join(explorerRoot, 'scripts/client-contract.mjs')).href)
-        if (manifest.formatVersion !== 1 || manifest.packageName !== '@me-tools/odx-explorer'
+        if (manifest.formatVersion !== 1 || manifest.packageName !== '@odxjs/explorer'
           || manifest.packageVersion !== context.pkg?.version || manifest.sourceHash !== await getExplorerSourceHash(explorerRoot)
           || manifest.lockfileHash !== await getWorkspaceLockHash(explorerRoot)) {
           throw new Error('Explorer client source or package version does not match.')
@@ -40,7 +40,7 @@ export default defineBuildConfig({
           throw new Error('Explorer static build identity does not match its bytes.')
       }
       catch (cause) {
-        throw new Error('Build the matching ODX Explorer static client before building the Nuxt package: pnpm --filter @me-tools/odx-explorer build', { cause })
+        throw new Error('Build the matching ODX Explorer static client before building the Nuxt package: pnpm --filter @odxjs/explorer build', { cause })
       }
       await cp(dirname(manifestPath), join(context.options.outDir, 'client'), { recursive: true })
     },

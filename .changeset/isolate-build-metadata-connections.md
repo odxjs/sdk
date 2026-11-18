@@ -1,5 +1,5 @@
 ---
-"@me-tools/odx-nuxt": patch
+"@odxjs/nuxt": patch
 ---
 
 Use a fresh HTTP(S) connection for each build-time metadata download. Synchronous

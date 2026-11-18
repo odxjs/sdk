@@ -1,6 +1,6 @@
 ---
-'@me-tools/odx-core': minor
-'@me-tools/odx-nuxt': minor
+'@odxjs/core': minor
+'@odxjs/nuxt': minor
 ---
 
 Preserve service-advertised entity identity and location from root and

@@ -1,4 +1,4 @@
-import type { ODataActionInvocation, ODataActionResponse, ODataAsyncDataPromise, ODataAtomicMutation, ODataBatchChangeSetResult, ODataBatchRead, ODataBatchReadResult, ODataChangeSetMethod, ODataChangeSetRequest, ODataChangeSetResponse, ODataCollectionPage, ODataContainedEntitySource, ODataContinuation, ODataCreateResponse, ODataDelta, ODataDeltaItem, ODataDeltaPage, ODataEntityResponse, ODataFunctionInvocation, ODataKey, ODataMediaCreateOptions, ODataMediaCreateResponse, ODataMediaMutationResponse, ODataMediaRequestOptions, ODataMediaResponse, ODataMediaUpdateOptions, ODataMutationResponse, ODataNavigationEntityRead, ODataNavigationSource, ODataNavigationUpdate, ODataPublicConfig, ODataQuery, ODataRequestOptions, ODataRuntimeEntitySet, ODataRuntimeService, ODataServiceRegistry, ODataV2AtomicMutation, ODataV2FunctionImportInvocation, RegisteredServiceNames } from '@me-tools/odx-core'
+import type { ODataActionInvocation, ODataActionResponse, ODataAsyncDataPromise, ODataAtomicMutation, ODataBatchChangeSetResult, ODataBatchRead, ODataBatchReadResult, ODataChangeSetMethod, ODataChangeSetRequest, ODataChangeSetResponse, ODataCollectionPage, ODataContainedEntitySource, ODataContinuation, ODataCreateResponse, ODataDelta, ODataDeltaItem, ODataDeltaPage, ODataEntityResponse, ODataFunctionInvocation, ODataKey, ODataMediaCreateOptions, ODataMediaCreateResponse, ODataMediaMutationResponse, ODataMediaRequestOptions, ODataMediaResponse, ODataMediaUpdateOptions, ODataMutationResponse, ODataNavigationEntityRead, ODataNavigationSource, ODataNavigationUpdate, ODataPublicConfig, ODataQuery, ODataRequestOptions, ODataRuntimeEntitySet, ODataRuntimeService, ODataServiceRegistry, ODataV2AtomicMutation, ODataV2FunctionImportInvocation, RegisteredServiceNames } from '@odxjs/core'
 import { useFetch, useRequestEvent, useRequestFetch, useRuntimeConfig } from '#imports'
 import {
   $odata,
@@ -41,7 +41,7 @@ import {
   validateODataMediaBody,
   validateODataMediaType,
   validateODataQualifiedName,
-} from '@me-tools/odx-core'
+} from '@odxjs/core'
 import { createFetch } from 'ofetch'
 import { computed, isReactive, isRef, toValue } from 'vue'
 import { useODataBasePath } from './useODataBasePath'

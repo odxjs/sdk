@@ -1,4 +1,4 @@
-import type { ODataExplorerGenerationFailure, ODataProxyConfig } from '@me-tools/odx-core'
+import type { ODataExplorerGenerationFailure, ODataProxyConfig } from '@odxjs/core'
 import { createError, defineEventHandler, getQuery, setHeader } from 'h3'
 import { join } from 'pathe'
 import { enforceExplorerEndpointPolicy, isProductionExplorerRuntime } from '../utils/explorer-policy'

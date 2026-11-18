@@ -1,6 +1,6 @@
-import type { CsdlDocument } from '@me-tools/odx-metadata'
+import type { CsdlDocument } from '@odxjs/metadata'
 import { readFileSync } from 'node:fs'
-import { parseCsdl } from '@me-tools/odx-metadata'
+import { parseCsdl } from '@odxjs/metadata'
 import { describe, expect, it } from 'vitest'
 import {
   detectODataVersionFromCsdlDocument,

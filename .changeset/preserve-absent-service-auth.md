@@ -1,5 +1,5 @@
 ---
-"@me-tools/odx-nuxt": patch
+"@odxjs/nuxt": patch
 ---
 
 Preserve omitted service authentication during configuration resolution so SDK

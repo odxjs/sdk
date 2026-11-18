@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-nuxt': minor
+'@odxjs/nuxt': minor
 ---
 
 Add request-scoped server entity create and delete operations so Nitro hosts can

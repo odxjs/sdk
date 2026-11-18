@@ -23,7 +23,7 @@ function safePath(path: string): boolean {
 export async function createExplorerClientMiddleware(directory: string, mount: ExplorerClientMount) {
   const manifest = JSON.parse(await readFile(join(directory, 'manifest.json'), 'utf8'))
   if (manifest.formatVersion !== 1 || manifest.baseURL !== '/__odx__/client/'
-    || manifest.packageName !== '@me-tools/odx-explorer' || !RE_DIGEST.test(manifest.buildId)
+    || manifest.packageName !== '@odxjs/explorer' || !RE_DIGEST.test(manifest.buildId)
     || !manifest.files || typeof manifest.files !== 'object' || Array.isArray(manifest.files)
     || Object.entries(manifest.files).some(([path, hash]) => !safePath(`/${path}`) || typeof hash !== 'string' || !RE_DIGEST.test(hash))
     || createHash('sha256').update(JSON.stringify(manifest.files)).digest('hex') !== manifest.buildId) {

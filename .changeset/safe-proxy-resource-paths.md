@@ -1,5 +1,5 @@
 ---
-"@me-tools/odx-proxy": patch
+"@odxjs/proxy": patch
 ---
 
 Reject traversing or malformed OData resource paths before they can escape a

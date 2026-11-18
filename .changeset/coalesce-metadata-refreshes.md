@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-proxy': patch
+'@odxjs/proxy': patch
 ---
 
 Coalesce concurrent production metadata refreshes for the same runtime cache

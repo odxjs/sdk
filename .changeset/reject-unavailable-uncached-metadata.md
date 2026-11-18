@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-nuxt': patch
+'@odxjs/nuxt': patch
 ---
 
 Reject Nuxt type preparation when remote service metadata cannot be downloaded

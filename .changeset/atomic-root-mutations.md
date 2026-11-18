@@ -1,6 +1,6 @@
 ---
-"@me-tools/odx-core": minor
-"@me-tools/odx-nuxt": minor
+"@odxjs/core": minor
+"@odxjs/nuxt": minor
 ---
 
 Support independent root entity creates and deletes in V4 changesets and in

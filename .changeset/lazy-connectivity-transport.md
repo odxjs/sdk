@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-proxy': patch
+'@odxjs/proxy': patch
 ---
 
 Load the Node-specific SAP Connectivity proxy transport only for requests that

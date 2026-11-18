@@ -20,7 +20,7 @@ describe('static Explorer delivery', () => {
       const template = '<html><head><script type="module" src="/__odx__/client/_nuxt/nested/app.js"></script></head><body><script>window.__NUXT__={config:{public:{},app:{baseURL:"/__odx__/client/"}}};window.__NUXT__.config=window.__NUXT__.config</script></body></html>'
       const script = 'console.log("synthetic-client")'
       const files = { 'index.html': createHash('sha256').update(template).digest('hex'), '_nuxt/nested/app.js': createHash('sha256').update(script).digest('hex') }
-      await writeFile(join(client, 'manifest.json'), JSON.stringify({ formatVersion: 1, packageName: '@me-tools/odx-explorer', baseURL: '/__odx__/client/', buildId: createHash('sha256').update(JSON.stringify(files)).digest('hex'), files }))
+      await writeFile(join(client, 'manifest.json'), JSON.stringify({ formatVersion: 1, packageName: '@odxjs/explorer', baseURL: '/__odx__/client/', buildId: createHash('sha256').update(JSON.stringify(files)).digest('hex'), files }))
       await writeFile(join(client, 'index.html'), template)
       await writeFile(join(client, '_nuxt', 'nested', 'app.js'), script)
       const route = '/console/__odx__/client'

@@ -1,11 +1,11 @@
-# @me-tools/odx-explorer
+# @odxjs/explorer
 
 A high-fidelity DevTools UI built with Nuxt UI for inspecting OData schemas, traffic, and entity data.
 
 ## Installation
 
 ```bash
-pnpm add @me-tools/odx-explorer
+pnpm add @odxjs/explorer
 ```
 
 ## Verification
@@ -24,7 +24,7 @@ layer uses its own framework installation.
 Run the Explorer package tests without the full workspace test suite:
 
 ```bash
-pnpm --filter @me-tools/odx-explorer run verify
+pnpm --filter @odxjs/explorer run verify
 ```
 
 The same state and layer tests also run from the workspace root:
@@ -46,8 +46,8 @@ root. Its state tests use that project's existing Nuxt app context instead of
 creating a competing application. Browser journeys are verified separately.
 
 ```bash
-pnpm --filter @me-tools/odx-nuxt exec playwright-core install chromium
-pnpm --filter @me-tools/odx-explorer test:browser
+pnpm --filter @odxjs/nuxt exec playwright-core install chromium
+pnpm --filter @odxjs/explorer test:browser
 ```
 
 The browser check builds its own Explorer, owns its temporary preview and uses
@@ -180,7 +180,7 @@ server runtime; see `DEPLOYMENT.md`.
 To profile an already-built static client with three fresh Chromium contexts:
 
 ```sh
-pnpm --filter @me-tools/odx-nuxt test:explorer-startup
+pnpm --filter @odxjs/nuxt test:explorer-startup
 ```
 
 The default verifies current source/lock/manifest identity. For an intentionally

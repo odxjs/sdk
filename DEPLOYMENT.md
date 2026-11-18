@@ -52,7 +52,7 @@ Verify the actual native source-host interaction independently of the static
 installed-consumer check:
 
 ```bash
-pnpm --filter @me-tools/odx-nuxt test:explorer-native
+pnpm --filter @odxjs/nuxt test:explorer-native
 ```
 
 This starts owned local hosts and Chromium against synthetic OData. It exercises
@@ -98,7 +98,7 @@ not reuse an earlier development or browser-test output. To check that build
 locally without creating an MTA archive or deploying:
 
 ```bash
-pnpm --filter @me-tools/odx-explorer exec nuxi build
+pnpm --filter @odxjs/explorer exec nuxi build
 ```
 
 ```bash

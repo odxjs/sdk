@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-core': minor
+'@odxjs/core': minor
 ---
 
 Add framework-neutral serialization and response parsing for independent,

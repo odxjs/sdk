@@ -1,5 +1,5 @@
 ---
-"@me-tools/odx-nuxt": minor
+"@odxjs/nuxt": minor
 ---
 
 Add request-scoped structured navigation create, update, and delete operations,

@@ -145,7 +145,7 @@ export default defineNitroPlugin((nitro) => {
       catch (err: any) {
         addTrace('BTP', `Failed to resolve destination: ${err.message}`, { error: err }, 'error')
         if (!isLocalBtpFallbackAllowed()) {
-          console.error(`[@me-tools/odx-proxy] BTP Destination Error [${matched.name}]:`, err.message)
+          console.error(`[@odxjs/proxy] BTP Destination Error [${matched.name}]:`, err.message)
           throw err
         }
       }

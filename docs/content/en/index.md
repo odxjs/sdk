@@ -49,7 +49,7 @@ description: Point ODX at a metadata URL and the SDK generates typed collections
 ---
 #code
   ```ts [composables/products.ts] {4-10}
-  import { odata } from '@me-tools/odx-nuxt'
+  import { odata } from '@odxjs/nuxt'
 
   // Fully typed from your EDMX schema
   const products = await odata.northwind
@@ -65,7 +65,7 @@ description: Point ODX at a metadata URL and the SDK generates typed collections
 
   ```ts [nuxt.config.ts] {4-11}
   export default defineNuxtConfig({
-    modules: ['@me-tools/odx-nuxt'],
+    modules: ['@odxjs/nuxt'],
 
     odx: {
       services: {
@@ -118,7 +118,7 @@ description: Point ODX at a metadata URL and the SDK generates typed collections
 docsLabel: Read the docs
 docsTo: /en/ecosystem/introduction
 githubLabel: Star on GitHub
-githubTo: https://github.com/me-tools/odx
+githubTo: https://github.com/odxjs/sdk
 title: Start with the package you need
 description: Install one package or compose the full ODX stack. Core, Proxy, Nuxt, and Explorer are designed to work independently and together.
 ---

@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-nuxt': patch
+'@odxjs/nuxt': patch
 ---
 
 Preserve UTF-8 characters split across metadata response chunks by decoding the

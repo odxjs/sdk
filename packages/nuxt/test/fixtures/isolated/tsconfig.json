@@ -5,9 +5,9 @@
     "moduleResolution": "Node",
     "paths": {
       "#imports": ["./.nuxt/imports.d.ts"],
-      "@me-tools/odx-core": ["../../../../core/src/index.ts"],
-      "@me-tools/odx-core/server": ["../../../../core/src/server.ts"],
-      "@me-tools/odx-proxy": ["../../../../proxy/src/index.ts"]
+      "@odxjs/core": ["../../../../core/src/index.ts"],
+      "@odxjs/core/server": ["../../../../core/src/server.ts"],
+      "@odxjs/proxy": ["../../../../proxy/src/index.ts"]
     },
     "types": ["node"],
     "strict": true,

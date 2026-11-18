@@ -9,8 +9,7 @@ site is not yet live.
 
 ODX works with any standard OData V2/V4 endpoint. Additionally, it comes with first-class support for SAP systems out of the box (handling NetWeaver routing, basic auth, and automated CSRF-Token pre-fetching).
 
-ODX is maintained under the company-neutral Modern Enterprise Tools (`me-tools`)
-organization.
+The ODX.js SDK is maintained in the ODX.js GitHub organization and uses the @odxjs npm scope.
 
 ## 📦 Packages
 
@@ -26,11 +25,11 @@ reusable npm package.
 
 | Package | Description |
 | :--- | :--- |
-| [`@me-tools/odx-metadata`](./packages/metadata) | Loss-aware, framework-neutral XML and JSON CSDL ingestion. |
-| [`@me-tools/odx-core`](./packages/core) | Core OData types and framework-agnostic utilities. |
-| [`@me-tools/odx-proxy`](./packages/proxy) | H3-based server proxy for OData backends. |
-| [`@me-tools/odx-nuxt`](./packages/nuxt) | The main Nuxt module and client-side composables. |
-| [`@me-tools/odx-explorer`](./packages/explorer) | Standalone UI for the ODX DevTools. |
+| [`@odxjs/metadata`](./packages/metadata) | Loss-aware, framework-neutral XML and JSON CSDL ingestion. |
+| [`@odxjs/core`](./packages/core) | Core OData types and framework-agnostic utilities. |
+| [`@odxjs/proxy`](./packages/proxy) | H3-based server proxy for OData backends. |
+| [`@odxjs/nuxt`](./packages/nuxt) | The main Nuxt module and client-side composables. |
+| [`@odxjs/explorer`](./packages/explorer) | Standalone UI for the ODX DevTools. |
 
 ## Repository Documentation
 
@@ -59,14 +58,14 @@ reusable npm package.
 1. Install the module:
 
 ```bash
-pnpm add @me-tools/odx-nuxt
+pnpm add @odxjs/nuxt
 ```
 
 2. Configure your services in `nuxt.config.ts`:
 
 ```typescript
 export default defineNuxtConfig({
-  modules: ['@me-tools/odx-nuxt'],
+  modules: ['@odxjs/nuxt'],
   odata: {
     services: [
       {
@@ -85,7 +84,7 @@ resolution without exposing or duplicating its backend URL:
 
 ```typescript
 export default defineNuxtConfig({
-  modules: ['@me-tools/odx-nuxt'],
+  modules: ['@odxjs/nuxt'],
   odata: {
     services: [{
       name: 'BusinessPartner',
@@ -159,15 +158,15 @@ without the surrounding lint, workspace typecheck, and publication checks.
 | Command | What it verifies |
 | :--- | :--- |
 | `pnpm run example:core` | Runs the standalone core example against local fixtures, covering EDMX version detection, entity extraction, query stringification, OData response flattening, and the low-level `$odata` helper. |
-| `pnpm run example:proxy` | Starts a local fixture backend and H3 proxy, then verifies proxied OData reads and header forwarding through `@me-tools/odx-proxy`. |
+| `pnpm run example:proxy` | Starts a local fixture backend and H3 proxy, then verifies proxied OData reads and header forwarding through `@odxjs/proxy`. |
 | `pnpm run examples` | Runs the core and proxy standalone examples together for a quick package isolation smoke check. |
 | `pnpm run verify:packages` | Runs the package-local verify scripts for metadata, core, proxy, Nuxt, Explorer, AppRouter, and docs without replacing broad `lint`, `typecheck`, or workspace `test`. |
 | `pnpm run bench:proxy` | Runs the proxy performance benchmark and reports direct, buffered proxy, streamed proxy, concurrent, and DevTools logging timing baselines. |
-| `pnpm --filter @me-tools/odx-metadata run verify` | Runs the loss-aware CSDL parser corpus, security cases, serialization, and deterministic hashing checks. |
-| `pnpm --filter @me-tools/odx-core run verify` | Runs the focused core Vitest tests and standalone fixture check through the package-local script. |
-| `pnpm --filter @me-tools/odx-proxy run verify` | Runs the proxy package Vitest suite and standalone fixture check through the package-local script. |
-| `pnpm --filter @me-tools/odx-nuxt run verify` | Runs the Nuxt package Vitest suite and minimal playground check through the package-local script. |
-| `pnpm --filter @me-tools/odx-nuxt run test:live:northwind` | Opt-in live smoke against the public Northwind V2 and V4 services; it is intentionally outside the repository gate. |
-| `pnpm --filter @me-tools/odx-explorer run verify` | Runs the Explorer package Vitest suite without the full workspace test run. |
+| `pnpm --filter @odxjs/metadata run verify` | Runs the loss-aware CSDL parser corpus, security cases, serialization, and deterministic hashing checks. |
+| `pnpm --filter @odxjs/core run verify` | Runs the focused core Vitest tests and standalone fixture check through the package-local script. |
+| `pnpm --filter @odxjs/proxy run verify` | Runs the proxy package Vitest suite and standalone fixture check through the package-local script. |
+| `pnpm --filter @odxjs/nuxt run verify` | Runs the Nuxt package Vitest suite and minimal playground check through the package-local script. |
+| `pnpm --filter @odxjs/nuxt run test:live:northwind` | Opt-in live smoke against the public Northwind V2 and V4 services; it is intentionally outside the repository gate. |
+| `pnpm --filter @odxjs/explorer run verify` | Runs the Explorer package Vitest suite without the full workspace test run. |
 | `pnpm --filter odx-approuter run verify` | Runs the AppRouter deployment config consistency check against `mta.yaml`. |
 | `pnpm --filter docs run verify` | Runs docs metadata extraction and API reference extraction without starting the docs dev server. |

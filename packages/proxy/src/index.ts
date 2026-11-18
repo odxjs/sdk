@@ -1,4 +1,4 @@
-import type { ODataProxyConfig } from '@me-tools/odx-core'
+import type { ODataProxyConfig } from '@odxjs/core'
 import { defineEventHandler } from 'h3'
 import odataHandler from './api/odata'
 import { normalizeODataServiceRoutes } from './utils/service-route'
@@ -36,7 +36,7 @@ export {
   sanitizeODataLog,
   setOdxLogStore,
   updateODataLog,
-} from '@me-tools/odx-core'
+} from '@odxjs/core'
 export type {
   ODataLog,
   OdxBoundedPayload,
@@ -47,7 +47,7 @@ export type {
   OdxLogStore,
   OdxLogUpdateOptions,
   ProxyTraceEntry,
-} from '@me-tools/odx-core'
+} from '@odxjs/core'
 
 /**
  * Creates a standalone h3 event handler for OData proxying.

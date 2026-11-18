@@ -1,4 +1,4 @@
-# @me-tools/odx-metadata
+# @odxjs/metadata
 
 Framework-neutral, loss-aware ingestion of OData CSDL metadata for ODX and higher-level semantic compilers.
 
@@ -6,14 +6,14 @@ Framework-neutral, loss-aware ingestion of OData CSDL metadata for ODX and highe
 
 ## Why this package exists
 
-`@me-tools/odx-core` continues to own the established low-level OData client utilities. This package introduces a separate metadata boundary for future consumers such as Nuxt Fiori: ingest XML or JSON CSDL without coupling metadata interpretation to a UI framework, transport, or generated client.
+`@odxjs/core` continues to own the established low-level OData client utilities. This package introduces a separate metadata boundary for future consumers such as Nuxt Fiori: ingest XML or JSON CSDL without coupling metadata interpretation to a UI framework, transport, or generated client.
 
 The first milestone is deliberately an information-preserving document model, not a fully linked semantic model. A later resolver can consume this model to resolve aliases, references, inheritance, terms, navigation bindings, and capabilities without reparsing source text.
 
 ## Installation
 
 ```bash
-pnpm add @me-tools/odx-metadata
+pnpm add @odxjs/metadata
 ```
 
 ## Basic usage
@@ -24,7 +24,7 @@ import {
   isCsdlDocument,
   parseCsdl,
   walkCsdlNodes,
-} from '@me-tools/odx-metadata'
+} from '@odxjs/metadata'
 
 const source = await fetch('/odata/$metadata').then(response => response.text())
 const result = parseCsdl(source, {
@@ -87,7 +87,7 @@ The XML reader rejects DTD and entity declarations and never performs external r
 - V2-to-V4 conversion
 - OData transport, caching, or request execution
 - SmartComponent state or UI rendering
-- Replacing the existing parser and APIs in `@me-tools/odx-core`
+- Replacing the existing parser and APIs in `@odxjs/core`
 - Byte-for-byte XML round trips from the AST
 
 ## Verification
@@ -95,8 +95,8 @@ The XML reader rejects DTD and entity declarations and never performs external r
 From the repository root:
 
 ```bash
-pnpm --filter @me-tools/odx-metadata run verify
-pnpm --filter @me-tools/odx-metadata run prepack
+pnpm --filter @odxjs/metadata run verify
+pnpm --filter @odxjs/metadata run prepack
 ```
 
 The focused suite covers V4.01 XML and JSON, conservative V2 preservation, extension data, duplicate JSON keys, large numeric lexemes, nullable defaults, stable identities, canonical/source hashing, malformed inputs, and XML security boundaries.

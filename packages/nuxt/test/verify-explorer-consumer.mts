@@ -26,7 +26,7 @@ async function main(): Promise<void> {
   const repoRoot = fileURLToPath(new URL('../../..', import.meta.url))
   const output = resolve(process.argv[2] || join(repoRoot, '.artifacts/explorer-installed-consumer'))
   const pnpm = process.env.npm_execpath
-  assert(pnpm, 'Run through pnpm --filter @me-tools/odx-nuxt test:explorer-consumer.')
+  assert(pnpm, 'Run through pnpm --filter @odxjs/nuxt test:explorer-consumer.')
   await mkdir(output, { recursive: true })
   const directory = await mkdtemp(join(tmpdir(), 'odx-installed-explorer-'))
   assert(resolve(directory).startsWith(`${resolve(tmpdir())}${sep}odx-installed-explorer-`))
@@ -164,7 +164,7 @@ async function main(): Promise<void> {
         if (content)
           before[file] = createHash('sha256').update(content).digest('hex')
       }
-      await pnpmRun(['--filter', `@me-tools/odx-${name}`, 'build'], repoRoot)
+      await pnpmRun(['--filter', `@odxjs/${name}`, 'build'], repoRoot)
       const after = await listClientFiles(join(packageRoot, 'src'))
       for (const file of ['package.json', 'build.config.ts', 'tsconfig.json']) {
         const content = await readFile(join(packageRoot, file)).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error))
@@ -180,7 +180,7 @@ async function main(): Promise<void> {
     for (const name of ['metadata', 'core', 'proxy', 'nuxt']) {
       await pnpmRun(['pack', '--pack-destination', tarballs], join(repoRoot, 'packages', name))
       const manifest = JSON.parse(await readFile(join(repoRoot, 'packages', name, 'package.json'), 'utf8'))
-      overrides[manifest.name] = `file:${join(tarballs, `me-tools-odx-${name}-${manifest.version}.tgz`).replaceAll('\\', '/')}`
+      overrides[manifest.name] = `file:${join(tarballs, `odxjs-${name}-${manifest.version}.tgz`).replaceAll('\\', '/')}`
     }
     const explorerManifest = JSON.parse(await readFile(join(repoRoot, 'packages/explorer/package.json'), 'utf8'))
     // This proves the delivery change on the existing host stack. Dependency
@@ -203,7 +203,7 @@ async function main(): Promise<void> {
       private: true,
       type: 'module',
       dependencies: {
-        '@me-tools/odx-nuxt': overrides['@me-tools/odx-nuxt'],
+        '@odxjs/nuxt': overrides['@odxjs/nuxt'],
         'nuxt': explorerManifest.devDependencies.nuxt,
         'vue': explorerManifest.devDependencies.vue,
       },
@@ -215,7 +215,7 @@ async function main(): Promise<void> {
     await writeFile(join(directory, 'pnpm-workspace.yaml'), `${JSON.stringify({ overrides }, null, 2)}\n`)
     await pnpmRun(['install', '--ignore-scripts', '--prefer-offline'], directory)
     const require = createRequire(join(directory, 'package.json'))
-    const installedRoot = dirname(require.resolve('@me-tools/odx-nuxt/package.json'))
+    const installedRoot = dirname(require.resolve('@odxjs/nuxt/package.json'))
     const installedRequire = createRequire(join(installedRoot, 'package.json'))
     const installedPackage = JSON.parse(await readFile(join(installedRoot, 'package.json'), 'utf8'))
     const generatorPath = installedRequire.resolve('@odata2ts/odata2ts/package.json')
@@ -241,10 +241,10 @@ async function main(): Promise<void> {
       import { createRequire } from 'node:module';
       import { join, dirname } from 'node:path';
       const require = createRequire(join(process.cwd(), 'package.json'));
-      const installedRoot = dirname(require.resolve('@me-tools/odx-nuxt/package.json'));
+      const installedRoot = dirname(require.resolve('@odxjs/nuxt/package.json'));
       const installedRequire = createRequire(join(installedRoot, 'package.json'));
       const unexpected = {};
-      for (const name of ['@me-tools/odx-explorer', '@nuxt/ui', '@vue-flow/core', 'elkjs']) {
+      for (const name of ['@odxjs/explorer', '@nuxt/ui', '@vue-flow/core', 'elkjs']) {
         try { unexpected[name] = installedRequire.resolve(name + '/package.json'); }
         catch (error) { if (!['MODULE_NOT_FOUND', 'ERR_PACKAGE_PATH_NOT_EXPORTED'].includes(error.code)) throw error; }
       }
@@ -258,9 +258,9 @@ async function main(): Promise<void> {
     await writeFile(join(output, 'installation-provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`)
     assert.equal(provenance.installedRoot, installedRoot)
     assert.deepEqual(provenance.unexpected, {}, 'The installed module must not resolve the Explorer UI runtime graph.')
-    assert.equal(installedPackage.dependencies['@me-tools/odx-explorer'], undefined)
+    assert.equal(installedPackage.dependencies['@odxjs/explorer'], undefined)
     const installedGraph = await readdir(join(directory, 'node_modules/.pnpm'))
-    for (const prefix of ['@me-tools+odx-explorer@', '@nuxt+ui@', '@vue-flow+core@', 'elkjs@'])
+    for (const prefix of ['@odxjs+explorer@', '@nuxt+ui@', '@vue-flow+core@', 'elkjs@'])
       assert(!installedGraph.some(name => name.startsWith(prefix)), `Unexpected installed runtime dependency: ${prefix}`)
     backend = await createExplorerBrowserBackend()
     await mkdir(join(directory, 'odx', 'temp'), { recursive: true })
@@ -270,7 +270,7 @@ async function main(): Promise<void> {
     await writeFile(join(directory, 'tsconfig.json'), '{"extends":"./.nuxt/tsconfig.json"}\n')
     await writeFile(join(directory, 'pages', 'index.vue'), '<template><h1>Installed ODX host</h1></template>\n')
     await writeFile(join(directory, 'nuxt.config.ts'), `export default defineNuxtConfig({
-      modules: ['@me-tools/odx-nuxt'],
+      modules: ['@odxjs/nuxt'],
       app: { baseURL: '/console/' },
       devtools: { enabled: false },
     odata: { mode: 'sdk', services: [{ name: 'LocalCatalog', route: 'catalog', strategy: 'proxied', url: ${JSON.stringify(backend.serviceUrl)} }] }

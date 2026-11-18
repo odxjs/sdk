@@ -1,5 +1,5 @@
 ---
-'@me-tools/odx-nuxt': patch
+'@odxjs/nuxt': patch
 ---
 
 Reject aborted, incomplete or failed metadata response streams instead of

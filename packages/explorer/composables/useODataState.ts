@@ -1,4 +1,4 @@
-import type { ODataLog as CoreODataLog, ProxyTraceEntry as CoreProxyTraceEntry, EntityMapping, ODataServiceConfig } from '@me-tools/odx-core'
+import type { ODataLog as CoreODataLog, ProxyTraceEntry as CoreProxyTraceEntry, EntityMapping, ODataServiceConfig } from '@odxjs/core'
 import type { ExplorerMutationTarget } from '../utils/recordIdentity'
 import type { ExplorerRequestTarget } from '../utils/requestTarget'
 import { useNuxtApp } from 'nuxt/app'

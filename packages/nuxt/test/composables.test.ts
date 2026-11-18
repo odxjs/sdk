@@ -1,4 +1,4 @@
-import * as core from '@me-tools/odx-core'
+import * as core from '@odxjs/core'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
 import { batchResponse } from './batch-response.fixture'
@@ -24,8 +24,8 @@ vi.mock('#imports', () => ({
 }))
 
 // Mock core library
-vi.mock('@me-tools/odx-core', async () => {
-  const actual = await vi.importActual('@me-tools/odx-core')
+vi.mock('@odxjs/core', async () => {
+  const actual = await vi.importActual('@odxjs/core')
   const { createODataContinuationPath, createODataDeltaPath, flattenOData, toODataCollectionPage } = await import('../../core/src/odata-utils')
   const {
     parseODataBatchChangeSetsResponse,

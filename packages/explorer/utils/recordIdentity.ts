@@ -1,5 +1,5 @@
-import type { ODataTypedKey, ODataTypedKeyPart } from '@me-tools/odx-core'
-import { createODataEntityPath, createODataTypedKey, formatODataKey } from '@me-tools/odx-core'
+import type { ODataTypedKey, ODataTypedKeyPart } from '@odxjs/core'
+import { createODataEntityPath, createODataTypedKey, formatODataKey } from '@odxjs/core'
 
 const RE_ENTITY_TAG = /^(?:W\/)?"[\x21\x23-\x7E\x80-\xFF]*"$/
 

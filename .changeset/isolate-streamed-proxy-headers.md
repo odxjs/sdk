@@ -1,5 +1,5 @@
 ---
-"@me-tools/odx-proxy": patch
+"@odxjs/proxy": patch
 ---
 
 Prevent the streaming HTTP proxy from restoring browser credentials and other

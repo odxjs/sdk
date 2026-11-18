@@ -1,6 +1,6 @@
 ---
-"@me-tools/odx-core": minor
-"@me-tools/odx-nuxt": patch
+"@odxjs/core": minor
+"@odxjs/nuxt": patch
 ---
 
 Add explicit, serializable typed entity keys with metadata-owned EDM types and

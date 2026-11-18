@@ -1,5 +1,5 @@
 ---
-"@me-tools/odx-core": patch
+"@odxjs/core": patch
 ---
 
 Redact repeatedly percent-encoded credential parameter names and embedded URL

@@ -10,5 +10,5 @@ export default defineBuildConfig({
   rollup: {
     emitCJS: false,
   },
-  externals: ['@me-tools/odx-metadata', 'ofetch'],
+  externals: ['@odxjs/metadata', 'ofetch'],
 })

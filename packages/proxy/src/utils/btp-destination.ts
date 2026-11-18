@@ -189,7 +189,7 @@ export async function resolveBtpDestination(
 
   if (!destService?.credentials || !xsuaaService?.credentials) {
     if (!isLocalBtpFallbackAllowed()) {
-      console.warn(`[@me-tools/odx-proxy] No BTP Service bindings found for "${serviceName}"`)
+      console.warn(`[@odxjs/proxy] No BTP Service bindings found for "${serviceName}"`)
     }
     if (!allowMissingBindingFallback) {
       throw new Error(`Failed to resolve BTP destination "${serviceName}": Destination and XSUAA service bindings are required`)

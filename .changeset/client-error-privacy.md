@@ -1,5 +1,5 @@
 ---
-"@me-tools/odx-core": patch
+"@odxjs/core": patch
 ---
 
 Stop automatically logging backend error payloads and response objects from
