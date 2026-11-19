@@ -144,18 +144,25 @@ describe('explorer State Composable', () => {
     vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => resolveSchema = resolve))
     state.selectedService.value = { name: 'Northwind', route: 'northwind', strategy: 'proxied' } as any
     state.selectedEntity.value = 'Products'
+    await nextTick()
+    const [oldSchemaUrl, oldSchemaOptions] = vi.mocked(fetch).mock.calls.at(-1)!
+    expect(oldSchemaUrl).toBe(buildSchemaEndpointUrl('Northwind'))
+
     let resolveData!: (response: Response) => void
     vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => resolveData = resolve))
     const oldRead = createEntityExplorer().refreshEntityData()
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ entities: [{ name: 'SAP product' }] })))
+    const oldDataSignal = vi.mocked(fetch).mock.calls.at(-1)![1]!.signal!
+    const sapSchema = { entities: [{ name: 'SAP product' }] }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(sapSchema)))
     state.selectedService.value = { name: 'SAP', route: 'sap', strategy: 'proxied' } as any
-    await nextTick()
-    await nextTick()
+    await vi.waitFor(() => expect(state.entitySchema.value).toEqual(sapSchema))
+    expect(oldSchemaOptions?.signal?.aborted).toBe(true)
+    expect(oldDataSignal.aborted).toBe(true)
+
     resolveSchema(new Response(JSON.stringify({ entities: [{ name: 'Wrong product' }] })))
     resolveData(new Response(JSON.stringify({ value: [{ ID: 'wrong-service' }] })))
     await oldRead
-    await nextTick()
-    expect(state.entitySchema.value).toEqual({ entities: [{ name: 'SAP product' }] })
+    expect(state.entitySchema.value).toEqual(sapSchema)
     expect(state.previewData.value).toBeNull()
     expect(state.entityDataCache.value[buildEntityPreviewCacheKey('SAP', 'Products')]).toBeUndefined()
     expect(state.entitySchemaLoading.value).toBe(false)
